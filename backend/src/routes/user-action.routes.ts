@@ -14,6 +14,7 @@ import {
   type AnalysisMode 
 } from '../services/credit-scaling.service.js';
 import { processAnalysisJob } from '../services/analysis-processor.service.js';
+import { routeModel } from '../services/model-routing.service.js';
 
 const router = Router();
 
@@ -23,9 +24,8 @@ const actionSchema = z.object({
   input_text: z.string().optional(),
   images: z.array(z.string().url()).optional(),
   mode: z.enum(['snapshot', 'expanded', 'deep']),
-  use_premium: z.boolean().optional().default(false),
-  modules: z.array(z.string()).optional().default([]),
-  batch_inputs: z.array(z.any()).optional().default([]),
+  expandedToggle: z.boolean().optional().default(false),    // PRO: Expanded toggle (+12 credits)
+  explanationToggle: z.boolean().optional().default(false), // PRO: Explanation toggle (+4), PLUS: Enhanced Explanation (+8)
   idempotency_key: z.string().uuid().optional(),
   recompute: z.boolean().optional().default(false), // Force recompute even if cached
 });
@@ -43,14 +43,13 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
     }
 
     const { 
-      input_text, 
-      images = [], 
-      mode, 
-      use_premium = false, 
-      modules = [], 
-      batch_inputs = [],
-      recompute = false,
-    } = validation.data;
+        input_text, 
+        images = [], 
+        mode, 
+        expandedToggle = false,
+        explanationToggle = false,
+        recompute = false,
+      } = validation.data;
 
     // Validate input exists
     if (!input_text && (!images || images.length === 0)) {
@@ -92,22 +91,11 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       return res.status(400).json({ error: 'Invalid subscription tier' });
     }
 
-    // Check batch limit
-    const batchCount = batch_inputs.length > 0 ? batch_inputs.length : 1;
-    if (batchCount > tier.batchLimit) {
-      return res.status(403).json({
-        error: 'batch_limit_exceeded',
-        message: `Your tier allows max ${tier.batchLimit} batch inputs. Upgrade to increase limit.`,
-        current_limit: tier.batchLimit,
-        requested: batchCount,
-      });
-    }
-
-    // Check deep mode access
+    // Check deep mode access (based on tier.deepAllowed from config)
     if (mode === 'deep' && !tier.deepAllowed) {
       return res.status(403).json({
         error: 'deep_mode_not_allowed',
-        message: 'Deep mode requires Plus or Max tier. Upgrade to access.',
+        message: 'Deep mode requires Pro, Plus, or Max tier. Upgrade to access.',
       });
     }
 
@@ -115,56 +103,47 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
     const isFreeTier = user.subscription_tier === 'free';
     let canUseFree = false;
     if (isFreeTier) {
-      // Free tier only allows snapshot mode
-      if (mode !== 'snapshot') {
-        return res.status(403).json({
-          error: 'mode_not_allowed',
-          message: 'Free tier only supports snapshot mode. Upgrade for expanded/deep modes.',
-        });
-      }
+      // Deep mode already checked above via tier.deepAllowed
       canUseFree = await canUseFreeAnalysis(userId);
       if (!canUseFree) {
         return res.status(402).json({
-          error: 'monthly_limit_reached',
-          message: 'Je hebt je maandelijkse gratis analyse al gebruikt. Upgrade naar Pro voor meer analyses.',
+          error: 'free_trial_exhausted',
+          message: 'Your free monthly analysis has been used. Upgrade to continue.',
           credits_needed: 0,
           credits_remaining: 0,
         });
       }
     }
 
-    // Determine provider and model
-    let provider: 'openai' = 'openai';
-    let model = tier.aiModel;
-    
-    // Override: snapshot always uses GPT-3.5 (cost control)
-    if (mode === 'snapshot') {
-      model = 'gpt-3.5-turbo';
-    }
-    
-    // Override: use_premium forces GPT-4
-    if (use_premium) {
-      model = 'gpt-4';
-    }
-
-    // Calculate credits using dynamic scaling
-    const creditCalc = calculateDynamicCredits({
+    // Use model routing to determine provider and model
+    const routing = routeModel(
+      user.subscription_tier as 'free' | 'pro' | 'plus' | 'max',
       mode,
+      inputText || '',
+      images.length > 0
+    );
+    
+    const provider = routing.provider;
+    const model = routing.model;
+    const actualMode = routing.mode;
+
+    // Calculate credits using dynamic scaling (tier-aware for new cost policy)
+    const creditCalc = calculateDynamicCredits({
+      mode: actualMode,
+      tier: user.subscription_tier as 'free' | 'pro' | 'plus' | 'max',
       inputText,
       images,
-      usePremium: use_premium,
-      batchInputs: batch_inputs,
-      modules,
-      deepModeRequested: mode === 'deep',
+      expandedToggle,
+      explanationToggle,
     });
 
-    const totalCredits = creditCalc.totalCredits;
+    const totalCredits = creditCalc.totalCreditsRequired;
     const creditsToDeduct = isFreeTier && canUseFree ? 0 : totalCredits;
 
     // Check cache (if not recomputing)
     if (!recompute && config.cache.enabled) {
       const normalizedInput = normalizeInputForHash(inputText);
-      const analysisHash = generateAnalysisHash(userId, normalizedInput, mode, model, use_premium);
+      const analysisHash = generateAnalysisHash(userId, normalizedInput, actualMode, model, expandedToggle, explanationToggle);
       
       const { data: cachedAnalysis } = await supabaseAdmin
         .from('analyses')
@@ -179,12 +158,14 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
 
       if (cachedAnalysis) {
         // Return cached result (no charge)
+        console.log(`[API] Returning cached analysis ${cachedAnalysis.id} for user ${userId}`);
         return res.json({
           analysis_id: cachedAnalysis.id,
           status: 'done',
           analysis_json: cachedAnalysis.analysis_json,
           credits_charged: 0,
           credits_remaining: user.credits_remaining,
+          provider_used: provider === 'groq' ? 'groq-llama3-8b' : model, // Groq returns groq-llama3-8b, OpenAI returns model name
           cached: true,
           message: 'Cached result (no credits charged)',
         });
@@ -214,9 +195,8 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
           'action_spend',
           {
             mode,
-            modules,
-            batch_count: batchCount,
-            use_premium: use_premium,
+            expanded_toggle: expandedToggle,
+            explanation_toggle: explanationToggle,
             breakdown: creditCalc.breakdown,
           }
         );
@@ -240,7 +220,7 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
 
     // Generate analysis hash
     const normalizedInput = normalizeInputForHash(inputText);
-    const analysisHash = generateAnalysisHash(userId, normalizedInput, mode, model, use_premium);
+    const analysisHash = generateAnalysisHash(userId, normalizedInput, mode, model, expandedToggle, explanationToggle);
 
     // Create analysis record
     const { data: analysis, error: analysisError } = await supabaseAdmin
@@ -249,15 +229,14 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
         user_id: userId,
         input_text: inputText || null,
         image_url: images.length > 0 ? images[0] : null, // Store first image URL
-        mode,
-        provider_used: provider,
+        mode: actualMode,
+        provider_used: provider === 'groq' ? 'groq-llama3-8b' : model, // Groq returns groq-llama3-8b, OpenAI returns model name
         model_version: model,
         credits_used: creditsToDeduct,
         tokens_estimated: creditCalc.tokensEstimated,
         analysis_hash: analysisHash,
-        use_premium: use_premium,
-        batch_count: batchCount,
-        modules: modules,
+        expanded_toggle: expandedToggle,
+        explanation_toggle: explanationToggle,
         status: 'queued',
       })
       .select()
@@ -294,28 +273,35 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       });
     }
 
-    // Process analysis asynchronously
+    console.log(`[API] Analysis ${analysis.id} queued for user ${userId}, mode: ${mode}, credits: ${creditsToDeduct}, provider: ${provider}, model: ${model}`);
+
+    // Process analysis asynchronously with routed model and mode
     processAnalysisJob(
       analysis.id,
       inputText,
       images,
-      mode,
+      actualMode, // Use actual mode from routing
       provider,
-      model,
+      model, // Use routed model
       userId,
       user.subscription_tier,
       creditsToDeduct,
-      creditsResult.transaction_id
+      creditsResult.transaction_id,
+      { expandedToggle, explanationToggle }
     ).catch(error => {
-      console.error('Error processing analysis:', error);
+      console.error(`[API] Error processing analysis ${analysis.id}:`, error);
       // Handle failure in processor
     });
 
     // Return 202 Accepted
+    const displayProvider = provider === 'groq' ? 'groq-llama3-8b' : `openai-${model}`;
     res.status(202).json({
       analysis_id: analysis.id,
       credits_charged: creditsToDeduct,
       credits_remaining: creditsResult.credits_remaining,
+      provider_used: displayProvider,
+      model_used: model,
+      mode_used: actualMode,
       queued: true,
       status: 'queued',
       breakdown: creditCalc.breakdown,

@@ -4,6 +4,7 @@ import stripeRoutes from './stripe.routes.js';
 import subscriptionRoutes from './subscription.routes.js';
 import adminRoutes from './admin.routes.js';
 import testRoutes from './test.routes.js';
+import authRoutes from './auth.routes.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.get('/health', (req, res) => {
 });
 
 // Mount routes
+router.use('/auth', authRoutes);
 router.use('/user', userRoutes);
 router.use('/webhook', stripeRoutes);
 router.use('/user', subscriptionRoutes);

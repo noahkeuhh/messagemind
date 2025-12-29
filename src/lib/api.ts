@@ -88,12 +88,21 @@ export async function apiRequest<T = any>(
     // Handle 402 - Insufficient Credits
     if (response.status === 402) {
       const data = await response.json();
-      const error: ApiError = {
-        error: 'insufficient_credits',
-        message: data.message || 'Not enough credits',
-        credits_needed: data.credits_needed,
-        credits_remaining: data.credits_remaining,
-      };
+      const error: any = new Error(data.message || 'Not enough credits');
+      error.error = 'insufficient_credits';
+      error.credits_needed = data.credits_needed;
+      error.credits_remaining = data.credits_remaining;
+      throw error;
+    }
+
+    // Handle 403 - Forbidden (deep mode, batch limit, etc)
+    if (response.status === 403) {
+      const data = await response.json();
+      const error: any = new Error(data.message || 'Access denied');
+      error.error = data.error || 'forbidden';
+      // Include additional context if available
+      if (data.current_limit !== undefined) error.current_limit = data.current_limit;
+      if (data.requested !== undefined) error.requested = data.requested;
       throw error;
     }
 
@@ -132,6 +141,9 @@ export const api = {
       daily_limit: number;
       last_reset_date: string;
       subscription_tier: string;
+      free_analysis_available?: boolean;
+      monthly_free_analyses_used?: number;
+      monthly_free_analyses_limit?: number;
     }>('/user/credits');
   },
 
@@ -140,37 +152,66 @@ export const api = {
     mode: 'snapshot' | 'expanded' | 'deep';
     input_text?: string;
     images?: string[];
-    use_premium?: boolean;
-    modules?: string[];
-    batch_inputs?: any[];
+    expandedToggle?: boolean;      // PRO: Expanded toggle (+12 credits)
+    explanationToggle?: boolean;   // PRO: Explanation toggle (+4), PLUS: Enhanced Explanation (+8)
     recompute?: boolean;
+    user_id?: string; // Optional, backend will use authenticated user if not provided
   }) {
-    return apiRequest<{
-      analysis_id: string;
-      status: string;
-      credits_charged: number;
-      credits_remaining: number;
-      queued: boolean;
-      breakdown?: any;
-      cached?: boolean;
-    }>('/user/action', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    try {
+      // Get user_id from session if not provided
+      let userId = data.user_id;
+      if (!userId) {
+        const session = await supabase.auth.getSession();
+        userId = session.data.session?.user?.id;
+      }
+
+      const requestData = {
+        ...data,
+        user_id: userId, // Include user_id in request
+      };
+
+      console.log('[API] Executing action:', { mode: data.mode, hasInput: !!data.input_text, hasImages: !!data.images?.length, userId });
+
+      return await apiRequest<{
+        analysis_id: string;
+        status: string;
+        credits_charged: number;
+        credits_remaining: number;
+        provider_used?: string; // Model name (gpt-4o-mini, gpt-4, etc.)
+        mode_used?: string; // Actual mode used (snapshot, expanded, deep)
+        queued: boolean;
+        breakdown?: any;
+        cached?: boolean;
+        analysis_json?: any; // Include analysis_json for cached responses
+      }>('/user/action', {
+        method: 'POST',
+        body: JSON.stringify(requestData),
+      });
+    } catch (error: any) {
+      console.error('[API] executeAction error:', error);
+      throw error;
+    }
   },
 
-  // Analysis (MessageMind format)
+  // Analysis (Production format)
   async getAnalysis(analysisId: string) {
-    return apiRequest<{
+    console.log(`[API] Fetching analysis ${analysisId}`);
+    const result = await apiRequest<{
       status: string;
       analysis_json: any;
       provider_used: string;
+      mode_used: string;
       credits_charged: number;
+      credits_remaining: number;
       tokens_actual: number;
-      mode: string;
       created_at: string;
       updated_at: string;
+      input_text: string;
+      image_url: string | null;
+      error_message?: string;
     }>(`/user/analysis/${analysisId}`);
+    console.log(`[API] Analysis ${analysisId} status: ${result.status}, provider: ${result.provider_used}, mode: ${result.mode_used}`);
+    return result;
   },
 
   // History
@@ -185,6 +226,7 @@ export const api = {
         created_at: string;
         analysis_result: any;
         provider_used: string;
+        mode: string;
       }>;
       total: number;
     }>(`/user/history?limit=${limit}&offset=${offset}`);
@@ -234,9 +276,8 @@ export const api = {
   // Subscriptions
   async subscribe(tier: string, interval: 'month' | 'year' = 'month') {
     return apiRequest<{
-      subscription_id: string;
-      client_secret: string;
-      status: string;
+      checkout_url: string;
+      session_id: string;
     }>('/user/subscribe', {
       method: 'POST',
       body: JSON.stringify({ tier, interval }),
@@ -278,6 +319,69 @@ export const api = {
     return apiRequest('/user', {
       method: 'DELETE',
     });
+  },
+
+  // Test endpoints (development only)
+  async setUserTier(tier: 'free' | 'pro' | 'plus' | 'max') {
+    return apiRequest<{
+      message: string;
+      user_id: string;
+      new_tier: string;
+      daily_credits_limit: number;
+      credits_remaining: number;
+    }>('/test/set-user-tier', {
+      method: 'POST',
+      body: JSON.stringify({ tier }),
+    });
+  },
+
+  // Auth endpoints
+  async forgotPassword(email: string) {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+    }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  async resetPassword(accessToken: string, newPassword: string) {
+    return apiRequest<{
+      success: boolean;
+      message: string;
+    }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        access_token: accessToken, 
+        new_password: newPassword 
+      }),
+    });
+  },
+
+  // Badges
+  async getBadges() {
+    return apiRequest<{
+      unlocked: Array<{
+        id: string;
+        name: string;
+        category: string;
+        description: string;
+        icon: string;
+        required_tier: string | null;
+        reward_credits: number;
+        unlocked_at: string;
+      }>;
+      locked: Array<{
+        id: string;
+        name: string;
+        category: string;
+        description: string;
+        icon: string;
+        required_tier: string | null;
+        reward_credits: number;
+      }>;
+    }>('/user/badges');
   },
 };
 

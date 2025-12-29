@@ -8,9 +8,9 @@ DECLARE
   tier_config JSONB;
   welcome_credits INTEGER;
 BEGIN
-  -- Default to 'pro' tier with welcome credits
-  tier_config := '{"pro": {"dailyCreditsLimit": 100}}'::jsonb;
-  welcome_credits := 100;
+  -- Default to 'free' tier with zero daily credits (1 free analysis tracked separately)
+  tier_config := '{"free": {"dailyCreditsLimit": 0}}'::jsonb;
+  welcome_credits := 0;
 
   -- Create user record
   INSERT INTO public.users (
@@ -24,7 +24,7 @@ BEGIN
   ) VALUES (
     NEW.id,
     NEW.email,
-    'pro',
+    'free',
     welcome_credits,
     welcome_credits,
     NOW(),
@@ -41,7 +41,7 @@ BEGIN
     NEW.id,
     'signup_bonus',
     welcome_credits,
-    jsonb_build_object('tier', 'pro', 'welcome_bonus', true)
+    jsonb_build_object('tier', 'free', 'welcome_bonus', true)
   );
 
   RETURN NEW;

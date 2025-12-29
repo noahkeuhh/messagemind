@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Heart, Menu, X, Sparkles } from "lucide-react";
+import { MessageCircle, Menu, X, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -54,20 +54,20 @@ export const Navbar = ({ onSignupClick, onLoginClick }: NavbarProps) => {
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           isScrolled
-            ? "bg-white/80 backdrop-blur-2xl shadow-lg border-b border-border/50"
+            ? "card-glass border-b border-white/20 shadow-lg"
             : "bg-transparent"
         }`}
       >
         <div className="container flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-accent to-rose-500 flex items-center justify-center shadow-lg shadow-accent/25 group-hover:shadow-accent/40 transition-all duration-300 group-hover:scale-105">
-              <Heart className="h-5 w-5 text-white" />
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-105" style={{ background: "linear-gradient(135deg, hsl(180 85% 65%) 0%, hsl(248 73% 70%) 100%)" }}>
+              <MessageCircle className="h-5 w-5 text-white" />
             </div>
             <span className={`text-xl font-bold font-display transition-colors ${
               isScrolled ? "text-foreground" : "text-white"
             }`}>
-              AI Flirt
+              MessageMind
             </span>
           </Link>
 
@@ -77,12 +77,12 @@ export const Navbar = ({ onSignupClick, onLoginClick }: NavbarProps) => {
               <a
                 key={link.label}
                 href={link.href}
-                className={`font-medium transition-all duration-300 hover:text-accent relative group ${
+                  className={`font-medium transition-all duration-300 hover:text-accent relative group ${
                   isScrolled ? "text-foreground" : "text-white/90"
                 }`}
               >
                 {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent rounded-full transition-all duration-300 group-hover:w-full" />
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-accent rounded-full transition-all duration-300 group-hover:w-full shadow-[0_0_8px_hsl(var(--accent))]" />
               </a>
             ))}
           </div>
@@ -109,7 +109,7 @@ export const Navbar = ({ onSignupClick, onLoginClick }: NavbarProps) => {
                   Log in
                 </Button>
                 <Button variant="hero" size="default" onClick={handleSignup}>
-                  Probeer gratis
+                  Try for free
                 </Button>
               </>
             )}
@@ -139,7 +139,7 @@ export const Navbar = ({ onSignupClick, onLoginClick }: NavbarProps) => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="fixed inset-x-0 top-20 z-40 bg-white/95 backdrop-blur-2xl border-b border-border shadow-xl md:hidden"
+            className="fixed inset-x-0 top-20 z-40 card-glass border-b border-white/20 shadow-xl md:hidden"
           >
             <div className="container py-8 space-y-6">
               {navLinks.map((link, index) => (
@@ -175,7 +175,7 @@ export const Navbar = ({ onSignupClick, onLoginClick }: NavbarProps) => {
                       handleSignup();
                       setIsMobileMenuOpen(false);
                     }}>
-                      Probeer gratis
+                      Try for free
                     </Button>
                   </>
                 )}

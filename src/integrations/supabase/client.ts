@@ -6,10 +6,10 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  console.error('❌ Supabase credentials missing!');
-  console.error('VITE_SUPABASE_URL:', SUPABASE_URL || 'MISSING');
-  console.error('VITE_SUPABASE_PUBLISHABLE_KEY:', SUPABASE_PUBLISHABLE_KEY ? '***' : 'MISSING');
-  console.error('Please check your .env file in the root directory');
+  console.warn('⚠️ Supabase credentials missing - using placeholder values');
+  console.warn('VITE_SUPABASE_URL:', SUPABASE_URL || 'MISSING');
+  console.warn('VITE_SUPABASE_PUBLISHABLE_KEY:', SUPABASE_PUBLISHABLE_KEY ? '***' : 'MISSING');
+  console.warn('App will run with limited functionality');
 }
 
 // Import the supabase client like this:

@@ -82,13 +82,13 @@ const SettingsContent = () => {
       if (error) throw error;
 
       toast({
-        title: "Profiel bijgewerkt",
-        description: "Je profiel is succesvol bijgewerkt",
+        title: "Profile updated",
+        description: "Your profile has been successfully updated",
       });
     } catch (error: any) {
       toast({
-        title: "Fout",
-        description: error.message || "Kon profiel niet bijwerken",
+        title: "Error",
+        description: error.message || "Could not update profile",
         variant: "destructive",
       });
     } finally {
@@ -99,8 +99,8 @@ const SettingsContent = () => {
   const handlePasswordUpdate = async () => {
     if (passwordData.new !== passwordData.confirm) {
       toast({
-        title: "Fout",
-        description: "Nieuwe wachtwoorden komen niet overeen",
+        title: "Error",
+        description: "New passwords do not match",
         variant: "destructive",
       });
       return;
@@ -108,8 +108,8 @@ const SettingsContent = () => {
 
     if (passwordData.new.length < 6) {
       toast({
-        title: "Fout",
-        description: "Wachtwoord moet minimaal 6 tekens lang zijn",
+        title: "Error",
+        description: "Password must be at least 6 characters long",
         variant: "destructive",
       });
       return;
@@ -124,15 +124,15 @@ const SettingsContent = () => {
       if (error) throw error;
 
       toast({
-        title: "Wachtwoord bijgewerkt",
-        description: "Je wachtwoord is succesvol gewijzigd",
+        title: "Password updated",
+        description: "Your password has been successfully changed",
       });
 
       setPasswordData({ current: "", new: "", confirm: "" });
     } catch (error: any) {
       toast({
-        title: "Fout",
-        description: error.message || "Kon wachtwoord niet wijzigen",
+        title: "Error",
+        description: error.message || "Could not change password",
         variant: "destructive",
       });
     } finally {
@@ -152,7 +152,7 @@ const SettingsContent = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-2xl font-bold font-display text-foreground mb-6">Instellingen</h1>
+            <h1 className="text-2xl font-bold font-display text-foreground mb-6">Settings</h1>
 
             <Tabs defaultValue="account" className="space-y-6">
               <TabsList>
@@ -166,7 +166,7 @@ const SettingsContent = () => {
                 </TabsTrigger>
                 <TabsTrigger value="notifications" className="gap-2">
                   <Bell className="h-4 w-4" />
-                  Notificaties
+                  Notifications
                 </TabsTrigger>
                 <TabsTrigger value="privacy" className="gap-2">
                   <Shield className="h-4 w-4" />
@@ -177,7 +177,7 @@ const SettingsContent = () => {
               {/* Account tab */}
               <TabsContent value="account" className="space-y-6">
                 <div className="card-elevated p-6">
-                  <h2 className="text-lg font-bold text-foreground mb-4">Profiel informatie</h2>
+                  <h2 className="text-lg font-bold text-foreground mb-4">Profile Information</h2>
                   <div className="space-y-4 max-w-md">
                     <div>
                       <Label htmlFor="email">Email</Label>
@@ -187,10 +187,10 @@ const SettingsContent = () => {
                         disabled
                         className="mt-1.5 bg-muted" 
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Email kan niet worden gewijzigd</p>
+                      <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
                     </div>
                     <div>
-                      <Label htmlFor="name">Naam</Label>
+                      <Label htmlFor="name">Name</Label>
                       <Input 
                         id="name" 
                         value={profileData.name}
@@ -207,20 +207,20 @@ const SettingsContent = () => {
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Opslaan...
+                          Saving...
                         </>
                       ) : (
-                        "Opslaan"
+                        "Save"
                       )}
                     </Button>
                   </div>
                 </div>
 
                 <div className="card-elevated p-6">
-                  <h2 className="text-lg font-bold text-foreground mb-4">Wachtwoord wijzigen</h2>
+                  <h2 className="text-lg font-bold text-foreground mb-4">Change Password</h2>
                   <div className="space-y-4 max-w-md">
                     <div>
-                      <Label htmlFor="new">Nieuw wachtwoord</Label>
+                      <Label htmlFor="new">New Password</Label>
                       <Input 
                         id="new" 
                         type="password" 
@@ -231,7 +231,7 @@ const SettingsContent = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="confirm">Bevestig nieuw wachtwoord</Label>
+                      <Label htmlFor="confirm">Confirm New Password</Label>
                       <Input 
                         id="confirm" 
                         type="password" 
@@ -249,10 +249,10 @@ const SettingsContent = () => {
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Wijzigen...
+                          Changing...
                         </>
                       ) : (
-                        "Wachtwoord wijzigen"
+                        "Change Password"
                       )}
                     </Button>
                   </div>
@@ -264,35 +264,66 @@ const SettingsContent = () => {
                 {subscriptionLoading ? (
                   <div className="card-elevated p-12 text-center">
                     <Loader2 className="h-8 w-8 animate-spin text-accent mx-auto mb-4" />
-                    <p className="text-muted-foreground">Billing informatie laden...</p>
+                    <p className="text-muted-foreground">Loading billing information...</p>
                   </div>
                 ) : (
                   <>
                     <div className="card-elevated p-6">
-                      <h2 className="text-lg font-bold text-foreground mb-4">Huidig abonnement</h2>
+                      <h2 className="text-lg font-bold text-foreground mb-4">Current Subscription</h2>
                       {subscriptionData ? (
                         <>
-                          <div className="flex items-center justify-between p-4 bg-accent/5 rounded-xl mb-4">
-                            <div>
-                              <p className="font-bold text-foreground capitalize">
-                                {subscriptionData.subscription_tier === 'free' ? 'Free' :
-                                 subscriptionData.subscription_tier === 'pro' ? 'Pro' :
-                                 subscriptionData.subscription_tier === 'plus' ? 'Plus' :
-                                 subscriptionData.subscription_tier === 'max' ? 'Max' : 'Free'} Plan
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {subscriptionData.subscription_info 
-                                  ? `Actief tot ${new Date(subscriptionData.subscription_info.current_period_end * 1000).toLocaleDateString('nl-NL')}`
-                                  : 'Geen actief abonnement'}
-                              </p>
+                          <div className="p-4 bg-accent/5 rounded-xl mb-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <p className="font-bold text-foreground capitalize">
+                                  {subscriptionData.subscription_tier === 'free' ? 'Free' :
+                                   subscriptionData.subscription_tier === 'pro' ? 'Pro' :
+                                   subscriptionData.subscription_tier === 'plus' ? 'Plus' :
+                                   subscriptionData.subscription_tier === 'max' ? 'Max' : 'Free'} Plan
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {subscriptionData.subscription_info 
+                                    ? `Active until ${new Date(subscriptionData.subscription_info.current_period_end * 1000).toLocaleDateString('en-US')}`
+                                    : subscriptionData.subscription_tier === 'free' ? '1 analysis per month' : 'No active subscription'}
+                                </p>
+                              </div>
+                              <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                                subscriptionData.subscription_tier === 'free' 
+                                  ? 'bg-muted text-muted-foreground'
+                                  : 'bg-success/10 text-success'
+                              }`}>
+                                {subscriptionData.subscription_tier === 'free' ? 'Free' : 'Active'}
+                              </span>
                             </div>
-                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                              subscriptionData.subscription_tier === 'free' 
-                                ? 'bg-muted text-muted-foreground'
-                                : 'bg-success/10 text-success'
-                            }`}>
-                              {subscriptionData.subscription_tier === 'free' ? 'Free' : 'Actief'}
-                            </span>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              {subscriptionData.subscription_tier === 'free' && (
+                                <>
+                                  <p>✓ 1 free analysis per month</p>
+                                  <p>✓ Snapshot mode</p>
+                                </>
+                              )}
+                              {subscriptionData.subscription_tier === 'pro' && (
+                                <>
+                                  <p>✓ 100 credits per day</p>
+                                  <p>✓ Snapshot & Expanded modes</p>
+                                </>
+                              )}
+                              {subscriptionData.subscription_tier === 'plus' && (
+                                <>
+                                  <p>✓ 180 credits per day</p>
+                                  <p>✓ Auto mode selection</p>
+                                  <p>✓ Expanded mode included</p>
+                                  <p>✓ Deep analysis toggle (+12 credits)</p>
+                                </>
+                              )}
+                              {subscriptionData.subscription_tier === 'max' && (
+                                <>
+                                  <p>✓ 300 credits per day</p>
+                                  <p>✓ Auto mode selection</p>
+                                  <p>✓ Deep mode included (×1.2)</p>
+                                </>
+                              )}
+                            </div>
                           </div>
                           <div className="flex gap-3">
                             <Button 
@@ -309,30 +340,30 @@ const SettingsContent = () => {
                                   try {
                                     await api.cancelSubscription(false);
                                     toast({
-                                      title: "Abonnement opgezegd",
-                                      description: "Je abonnement wordt opgezegd aan het einde van de huidige periode.",
+                                    title: "Subscription cancelled",
+                                    description: "Your subscription will be cancelled at the end of the current period.",
                                     });
                                   } catch (error: any) {
                                     toast({
                                       title: "Fout",
-                                      description: error.message || "Kon abonnement niet opzeggen",
+                                      description: error.message || "Could not cancel subscription",
                                       variant: "destructive",
                                     });
                                   }
                                 }}
                               >
-                                Opzeggen
+                                Cancel
                               </Button>
                             )}
                           </div>
                         </>
                       ) : (
-                        <p className="text-muted-foreground">Geen abonnement informatie beschikbaar</p>
+                        <p className="text-muted-foreground">No subscription information available</p>
                       )}
                     </div>
 
                     <div className="card-elevated p-6">
-                      <h2 className="text-lg font-bold text-foreground mb-4">Betaalmethode</h2>
+                      <h2 className="text-lg font-bold text-foreground mb-4">Payment Method</h2>
                       {subscriptionData?.payment_method ? (
                         <div className="flex items-center justify-between p-4 bg-muted rounded-xl mb-4">
                           <div className="flex items-center gap-3">
@@ -344,7 +375,7 @@ const SettingsContent = () => {
                                 •••• •••• •••• {subscriptionData.payment_method.card?.last4}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Verloopt {subscriptionData.payment_method.card?.exp_month}/{subscriptionData.payment_method.card?.exp_year}
+                                Expires {subscriptionData.payment_method.card?.exp_month}/{subscriptionData.payment_method.card?.exp_year}
                               </p>
                             </div>
                           </div>
@@ -364,12 +395,12 @@ const SettingsContent = () => {
                               }
                             }}
                           >
-                            Wijzigen
+                            Change
                           </Button>
                         </div>
                       ) : (
                         <div className="p-4 bg-muted rounded-xl">
-                          <p className="text-muted-foreground">Geen betaalmethode opgeslagen</p>
+                          <p className="text-muted-foreground">No payment method saved</p>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -380,42 +411,42 @@ const SettingsContent = () => {
                                 window.location.href = url;
                               } catch (error: any) {
                                 toast({
-                                  title: "Fout",
-                                  description: error.message || "Kon billing portal niet openen",
+                                  title: "Error",
+                                  description: error.message || "Could not open billing portal",
                                   variant: "destructive",
                                 });
                               }
                             }}
                           >
-                            Betaalmethode toevoegen
+                            Add Payment Method
                           </Button>
                         </div>
                       )}
                     </div>
 
                     <div className="card-elevated p-6">
-                      <h2 className="text-lg font-bold text-foreground mb-4">Gebruik statistieken</h2>
+                      <h2 className="text-lg font-bold text-foreground mb-4">Usage Statistics</h2>
                       <div className="grid sm:grid-cols-3 gap-4">
                         <div className="p-4 bg-muted rounded-xl">
                           <p className="text-2xl font-bold text-foreground">
                             {subscriptionData?.usage?.analyses_this_month || 0}
                           </p>
-                          <p className="text-sm text-muted-foreground">Analyses deze maand</p>
+                          <p className="text-sm text-muted-foreground">Analyses this month</p>
                         </div>
                         <div className="p-4 bg-muted rounded-xl">
                           <p className="text-2xl font-bold text-foreground">
                             {subscriptionData?.usage?.credits_used_this_month || 0}
                           </p>
-                          <p className="text-sm text-muted-foreground">Credits gebruikt</p>
+                          <p className="text-sm text-muted-foreground">Credits used</p>
                         </div>
                         <div className="p-4 bg-muted rounded-xl">
                           <p className="text-2xl font-bold text-foreground">
                             {subscriptionData?.subscription_tier === 'free' ? 'Free' :
                              subscriptionData?.subscription_tier === 'pro' ? '100' :
                              subscriptionData?.subscription_tier === 'plus' ? '180' :
-                             subscriptionData?.subscription_tier === 'max' ? '300' : '0'}/dag
+                             subscriptionData?.subscription_tier === 'max' ? '300' : '0'}/day
                           </p>
-                          <p className="text-sm text-muted-foreground">Dagelijks limiet</p>
+                          <p className="text-sm text-muted-foreground">Daily limit</p>
                         </div>
                       </div>
                     </div>
@@ -426,13 +457,13 @@ const SettingsContent = () => {
               {/* Notifications tab */}
               <TabsContent value="notifications" className="space-y-6">
                 <div className="card-elevated p-6">
-                  <h2 className="text-lg font-bold text-foreground mb-4">Notificatie voorkeuren</h2>
+                  <h2 className="text-lg font-bold text-foreground mb-4">Notification Preferences</h2>
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-foreground">Email notificaties</p>
+                        <p className="font-medium text-foreground">Email Notifications</p>
                         <p className="text-sm text-muted-foreground">
-                          Ontvang updates over je account via email
+                          Receive updates about your account via email
                         </p>
                       </div>
                       <Switch
@@ -444,9 +475,9 @@ const SettingsContent = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-foreground">Push notificaties</p>
+                        <p className="font-medium text-foreground">Push Notifications</p>
                         <p className="text-sm text-muted-foreground">
-                          Ontvang push notificaties in je browser
+                          Receive push notifications in your browser
                         </p>
                       </div>
                       <Switch
@@ -458,9 +489,9 @@ const SettingsContent = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-foreground">Marketing emails</p>
+                        <p className="font-medium text-foreground">Marketing Emails</p>
                         <p className="text-sm text-muted-foreground">
-                          Tips, nieuwe features en speciale aanbiedingen
+                          Tips, new features and special offers
                         </p>
                       </div>
                       <Switch
@@ -479,8 +510,8 @@ const SettingsContent = () => {
                 <div className="card-elevated p-6">
                   <h2 className="text-lg font-bold text-foreground mb-4">Data & Privacy</h2>
                   <p className="text-muted-foreground mb-4">
-                    Je privacy is belangrijk voor ons. Al je chats en analyses worden versleuteld
-                    opgeslagen en nooit gedeeld met derden.
+                    Your privacy is important to us. All your chats and analyses are encrypted
+                    and stored securely and never shared with third parties.
                   </p>
                   <div className="flex gap-3">
                     <Button 
@@ -500,13 +531,13 @@ const SettingsContent = () => {
                           document.body.removeChild(a);
                           URL.revokeObjectURL(url);
                           toast({
-                            title: "Data gedownload",
-                            description: "Je data is succesvol gedownload",
+                            title: "Data downloaded",
+                            description: "Your data was successfully downloaded",
                           });
                         } catch (error: any) {
                           toast({
-                            title: "Fout",
-                            description: error.message || "Kon data niet exporteren",
+                            title: "Error",
+                            description: error.message || "Could not export data",
                             variant: "destructive",
                           });
                         } finally {
@@ -518,12 +549,12 @@ const SettingsContent = () => {
                       {isLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Exporteren...
+                          Exporting...
                         </>
                       ) : (
                         <>
                           <Download className="h-4 w-4 mr-2" />
-                          Download mijn data
+                          Download my data
                         </>
                       )}
                     </Button>
@@ -539,15 +570,15 @@ const SettingsContent = () => {
                 <div className="card-elevated p-6 border-destructive/20">
                   <h2 className="text-lg font-bold text-destructive mb-4">Danger Zone</h2>
                   <p className="text-muted-foreground mb-4">
-                    Als je je account verwijdert, worden al je data permanent gewist.
-                    Dit kan niet ongedaan worden gemaakt.
+                    If you delete your account, all your data will be permanently erased.
+                    This cannot be undone.
                   </p>
                   <Button 
                     variant="destructive"
                     onClick={() => setShowDeleteDialog(true)}
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Account verwijderen
+                    Delete Account
                   </Button>
                 </div>
               </TabsContent>
@@ -560,21 +591,21 @@ const SettingsContent = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Account verwijderen?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
             <AlertDialogDescription>
-              Deze actie kan niet ongedaan worden gemaakt. Dit zal permanent je account en alle data verwijderen.
+              This action cannot be undone. This will permanently delete your account and all data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuleren</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
                 setIsLoading(true);
                 try {
                   await api.deleteAccount();
                   toast({
-                    title: "Account verwijderd",
-                    description: "Je account is verwijderd. Je wordt uitgelogd.",
+                    title: "Account deleted",
+                    description: "Your account has been deleted. You will be logged out.",
                   });
                   setTimeout(() => {
                     signOut();
@@ -582,8 +613,8 @@ const SettingsContent = () => {
                   }, 2000);
                 } catch (error: any) {
                   toast({
-                    title: "Fout",
-                    description: error.message || "Kon account niet verwijderen",
+                    title: "Error",
+                    description: error.message || "Could not delete account",
                     variant: "destructive",
                   });
                 } finally {
@@ -593,7 +624,7 @@ const SettingsContent = () => {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Verwijderen
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

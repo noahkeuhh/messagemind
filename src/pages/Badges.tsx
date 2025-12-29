@@ -1,219 +1,290 @@
-import { motion } from "framer-motion";
-import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { Button } from "@/components/ui/button";
-import {
-  Award,
-  Flame,
-  Target,
-  Zap,
-  Crown,
-  MessageSquare,
-  Calendar,
-  Share2,
-  Lock,
+import { useAuth } from "@/contexts/AuthContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Trophy, Lock, Award, Sparkles, 
+  Target, Flame, Layers, Eye, Crown,
+  TrendingUp, Star
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BadgeCard from "@/components/BadgeCard";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-const badges = [
-  {
-    id: "first_analysis",
-    name: "Eerste Stap",
-    description: "Voltooi je eerste analyse",
-    icon: Target,
-    earned: true,
-    earnedAt: "2 dagen geleden",
-  },
-  {
-    id: "streak_3",
-    name: "3-Daagse Streak",
-    description: "Analyseer 3 dagen achter elkaar",
-    icon: Flame,
-    earned: true,
-    earnedAt: "Gisteren",
-  },
-  {
-    id: "streak_7",
-    name: "Week Warrior",
-    description: "7 dagen achter elkaar actief",
-    icon: Flame,
-    earned: false,
-    progress: 3,
-    total: 7,
-  },
-  {
-    id: "analyses_10",
-    name: "Analyse Expert",
-    description: "Voltooi 10 analyses",
-    icon: MessageSquare,
-    earned: true,
-    earnedAt: "Vandaag",
-  },
-  {
-    id: "analyses_50",
-    name: "Chat Master",
-    description: "Voltooi 50 analyses",
-    icon: Crown,
-    earned: false,
-    progress: 12,
-    total: 50,
-  },
-  {
-    id: "perfect_score",
-    name: "Perfect Match",
-    description: "Krijg een 95+ interesse score",
-    icon: Zap,
-    earned: false,
-    locked: true,
-  },
-];
-
-const streakDays = [
-  { day: "Ma", active: true },
-  { day: "Di", active: true },
-  { day: "Wo", active: true },
-  { day: "Do", active: false, today: true },
-  { day: "Vr", active: false },
-  { day: "Za", active: false },
-  { day: "Zo", active: false },
-];
+interface Badge {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  icon: string;
+  required_tier: string | null;
+  reward_credits: number;
+}
 
 const BadgesContent = () => {
-  const earnedBadges = badges.filter(b => b.earned);
-  const unearnedBadges = badges.filter(b => !b.earned);
+  const { user } = useAuth();
+  
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["badges"],
+    queryFn: async () => {
+      try {
+        const response = await api.getBadges();
+        return response;
+      } catch (err) {
+        console.error('Badges fetch error:', err);
+        throw err;
+      }
+    },
+    retry: false,
+    enabled: !!user,
+  });
+
+  const getCategoryIcon = (category: string) => {
+    const icons: Record<string, any> = {
+      usage: Target,
+      streak: Flame,
+      mode: Layers,
+      skill: Eye,
+      plan: Crown,
+    };
+    return icons[category] || Trophy;
+  };
+
+  const getCategoryName = (category: string) => {
+    const names: Record<string, string> = {
+      usage: "Gebruik",
+      streak: "Streaks",
+      mode: "Modi",
+      skill: "Vaardigheid",
+      plan: "Abonnement",
+    };
+    return names[category] || category;
+  };
+
+  const groupByCategory = (badges: Badge[]) => {
+    const grouped: Record<string, Badge[]> = {};
+    for (const badge of badges) {
+      if (!grouped[badge.category]) {
+        grouped[badge.category] = [];
+      }
+      grouped[badge.category].push(badge);
+    }
+    return grouped;
+  };
+
+  const unlocked = data?.unlocked || [];
+  const locked = data?.locked || [];
+  const allBadges = [...unlocked, ...locked];
+
+  const groupedAll = groupByCategory(allBadges);
+  const groupedUnlocked = groupByCategory(unlocked);
+  const groupedLocked = groupByCategory(locked);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Badges laden...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    console.error('Badge error details:', error);
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center max-w-md">
+          <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-bold text-foreground mb-2">Kan badges niet laden</h3>
+          <p className="text-muted-foreground mb-4">
+            Er is een probleem bij het ophalen van badges.
+          </p>
+          <p className="text-sm text-muted-foreground/70 font-mono">
+            {error?.message || 'Onbekende fout'}
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => window.location.reload()}
+          >
+            Probeer opnieuw
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <DashboardSidebar />
-      
-      <div className="flex-1 flex flex-col">
-        <DashboardHeader />
-        
-        <main className="flex-1 p-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
-            {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold font-display text-foreground">Badges & Streaks</h1>
-              <p className="text-muted-foreground">Verdien badges en houd je streak bij</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <main className="mx-auto max-w-5xl">
+          <AnimatePresence>
+            {user ? (
+              <motion.div
+                key="badges-page"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-8"
+              >
+                {/* Header */}
+                <div>
+                  <h1 className="text-2xl font-bold font-display text-foreground">Badges</h1>
+                  <p className="text-muted-foreground">Verdien badges door analyses te voltooien</p>
+                </div>
 
-            {/* Streak tracker */}
-            <div className="card-elevated p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
-                    <Flame className="h-6 w-6 text-accent" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold font-display text-foreground">3 dagen streak!</h2>
-                    <p className="text-sm text-muted-foreground">Nog 4 dagen tot Week Warrior badge</p>
+                {/* Progress Summary */}
+                <div className="card-elevated p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
+                        <Trophy className="h-8 w-8 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold font-display text-foreground">
+                          {unlocked.length} / {allBadges.length}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">Badges ontgrendeld</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-accent">
+                        {allBadges.length > 0 ? Math.round((unlocked.length / allBadges.length) * 100) : 0}%
+                      </div>
+                      <p className="text-xs text-muted-foreground">Voltooid</p>
+                    </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Deel
-                </Button>
-              </div>
 
-              <div className="flex justify-between">
-                {streakDays.map((day, index) => (
-                  <div key={index} className="text-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
-                      day.active ? 'bg-accent text-accent-foreground' :
-                      day.today ? 'border-2 border-accent border-dashed' :
-                      'bg-muted'
-                    }`}>
-                      {day.active && <Flame className="h-5 w-5" />}
-                    </div>
-                    <span className={`text-xs ${day.today ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
-                      {day.day}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+                {/* Tabs */}
+                <Tabs defaultValue="all" className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-6">
+                    <TabsTrigger value="all">
+                      Alle badges ({allBadges.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="unlocked">
+                      Ontgrendeld ({unlocked.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="locked">
+                      Vergrendeld ({locked.length})
+                    </TabsTrigger>
+                  </TabsList>
 
-            {/* Earned badges */}
-            <div>
-              <h2 className="text-lg font-bold font-display text-foreground mb-4 flex items-center gap-2">
-                <Award className="h-5 w-5 text-secondary" />
-                Verdiende badges ({earnedBadges.length})
-              </h2>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {earnedBadges.map((badge, index) => (
-                  <motion.div
-                    key={badge.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="card-elevated p-5 relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-secondary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center mb-3">
-                        <badge.icon className="h-6 w-6 text-secondary" />
-                      </div>
-                      <h3 className="font-bold text-foreground">{badge.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{badge.description}</p>
-                      <span className="text-xs text-success">✓ Verdiend {badge.earnedAt}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* Unearned badges */}
-            <div>
-              <h2 className="text-lg font-bold font-display text-foreground mb-4 flex items-center gap-2">
-                <Lock className="h-5 w-5 text-muted-foreground" />
-                Te verdienen ({unearnedBadges.length})
-              </h2>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {unearnedBadges.map((badge, index) => (
-                  <motion.div
-                    key={badge.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.1 }}
-                    className={`card-elevated p-5 ${badge.locked ? 'opacity-50' : ''}`}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mb-3">
-                      {badge.locked ? (
-                        <Lock className="h-6 w-6 text-muted-foreground" />
-                      ) : (
-                        <badge.icon className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    <h3 className="font-bold text-foreground">{badge.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">{badge.description}</p>
-                    
-                    {badge.progress !== undefined && (
-                      <div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                          <span>Voortgang</span>
-                          <span>{badge.progress}/{badge.total}</span>
+                  {/* All Badges Tab */}
+                  <TabsContent value="all" className="space-y-8">
+                    {Object.entries(groupedAll).map(([category, badges]) => {
+                      const CategoryIcon = getCategoryIcon(category);
+                      return (
+                        <div key={category}>
+                          <h2 className="text-lg font-bold font-display text-foreground mb-4 flex items-center gap-2">
+                            <CategoryIcon className="h-5 w-5 text-accent" />
+                            {getCategoryName(category)}
+                          </h2>
+                          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {badges.map((badge) => {
+                              const isUnlocked = unlocked.some((u) => u.id === badge.id);
+                              const unlockedBadge = unlocked.find((u) => u.id === badge.id);
+                              return (
+                                <BadgeCard
+                                  key={badge.id}
+                                  badge={badge}
+                                  unlocked={isUnlocked}
+                                  unlockedAt={unlockedBadge?.unlocked_at}
+                                  size="md"
+                                />
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-accent rounded-full transition-all"
-                            style={{ width: `${(badge.progress / badge.total) * 100}%` }}
-                          />
-                        </div>
+                      );
+                    })}
+                  </TabsContent>
+
+                  {/* Unlocked Badges Tab */}
+                  <TabsContent value="unlocked" className="space-y-8">
+                    {Object.keys(groupedUnlocked).length === 0 ? (
+                      <div className="card-elevated p-12 text-center">
+                        <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="font-bold text-foreground mb-2">Nog geen badges ontgrendeld</h3>
+                        <p className="text-muted-foreground mb-6">
+                          Voltooi je eerste analyse om je eerste badge te verdienen!
+                        </p>
+                        <Button asChild>
+                          <a href="/dashboard">
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Start analyse
+                          </a>
+                        </Button>
                       </div>
+                    ) : (
+                      Object.entries(groupedUnlocked).map(([category, badges]) => {
+                        const CategoryIcon = getCategoryIcon(category);
+                        return (
+                          <div key={category}>
+                            <h2 className="text-lg font-bold font-display text-foreground mb-4 flex items-center gap-2">
+                              <CategoryIcon className="h-5 w-5 text-accent" />
+                              {getCategoryName(category)}
+                            </h2>
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {badges.map((badge) => {
+                                const unlockedBadge = badge as Badge & { unlocked_at: string };
+                                return (
+                                  <BadgeCard
+                                    key={badge.id}
+                                    badge={badge}
+                                    unlocked={true}
+                                    unlockedAt={unlockedBadge.unlocked_at}
+                                    size="md"
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
-                    
-                    {badge.locked && (
-                      <span className="text-xs text-muted-foreground">Binnenkort beschikbaar</span>
+                  </TabsContent>
+
+                  {/* Locked Badges Tab */}
+                  <TabsContent value="locked" className="space-y-8">
+                    {Object.keys(groupedLocked).length === 0 ? (
+                      <div className="card-elevated p-12 text-center">
+                        <Trophy className="h-12 w-12 text-accent mx-auto mb-4" />
+                        <h3 className="font-bold text-foreground mb-2">Alle badges ontgrendeld! 🎉</h3>
+                        <p className="text-muted-foreground">
+                          Geweldig werk! Je hebt alle beschikbare badges verdiend.
+                        </p>
+                      </div>
+                    ) : (
+                      Object.entries(groupedLocked).map(([category, badges]) => {
+                        const CategoryIcon = getCategoryIcon(category);
+                        return (
+                          <div key={category}>
+                            <h2 className="text-lg font-bold font-display text-foreground mb-4 flex items-center gap-2">
+                              <CategoryIcon className="h-5 w-5 text-muted-foreground" />
+                              {getCategoryName(category)}
+                            </h2>
+                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {badges.map((badge) => (
+                                <BadgeCard
+                                  key={badge.id}
+                                  badge={badge}
+                                  unlocked={false}
+                                  size="md"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })
                     )}
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
+                  </TabsContent>
+                </Tabs>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </main>
       </div>
     </div>

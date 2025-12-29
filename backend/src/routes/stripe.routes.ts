@@ -103,7 +103,38 @@ async function handleStripeEvent(event: any) {
 async function handleCheckoutCompleted(session: any) {
   const userId = session.client_reference_id || session.metadata?.user_id;
   const packId = session.metadata?.pack_id;
+  const tier = session.metadata?.tier;
 
+  // Handle subscription checkout
+  if (session.mode === 'subscription' && tier && userId) {
+    console.log(`[Webhook] Activating subscription for user ${userId}, tier: ${tier}`);
+    
+    const subscriptionId = session.subscription;
+    const customerId = session.customer;
+
+    // Get tier config
+    const tierConfig = config.subscriptionTiers[tier as keyof typeof config.subscriptionTiers] || config.subscriptionTiers.pro;
+
+    // Update user with new subscription
+    const { error } = await supabaseAdmin
+      .from('users')
+      .update({
+        subscription_tier: tier,
+        daily_credits_limit: tierConfig.dailyCreditsLimit,
+        stripe_subscription_id: subscriptionId,
+        stripe_customer_id: customerId,
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('[Webhook] Error updating user subscription:', error);
+    } else {
+      console.log(`[Webhook] ✅ Subscription activated for user ${userId}`);
+    }
+    return;
+  }
+
+  // Handle credit pack purchase (legacy)
   if (!userId || !packId) {
     console.error('Missing userId or packId in checkout session');
     return;

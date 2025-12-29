@@ -118,39 +118,9 @@ export async function atomicCreditDeduction(
 }
 
 /**
- * Calculate credits needed for analysis based on input/output size
+ * Legacy: These functions have been replaced by calculateDynamicCredits in credit-scaling.service.ts
+ * Use that service instead for spec-compliant credit calculations
  */
-export function calculateCreditsNeeded(
-  actionType: 'short_chat' | 'long_chat' | 'image_analysis',
-  inputText: string,
-  outputTokens: number = 0
-): number {
-  const baseCost = config.actionCosts[actionType] || 5;
-  
-  // Calculate extra credits for large input (per 100 chars over base)
-  const inputLength = inputText?.length || 0;
-  const baseInputLength = actionType === 'short_chat' ? 200 : actionType === 'long_chat' ? 500 : 0;
-  const extraInputChars = Math.max(0, inputLength - baseInputLength);
-  const extraInputCredits = Math.floor(extraInputChars / 100) * config.creditCalculation.extraInputPer100Chars;
-  
-  // Calculate extra credits for large output (per 100 tokens over base)
-  const baseOutputTokens = actionType === 'short_chat' ? 200 : actionType === 'long_chat' ? 400 : 300;
-  const extraOutputTokens = Math.max(0, outputTokens - baseOutputTokens);
-  const extraOutputCredits = Math.floor(extraOutputTokens / 100) * config.creditCalculation.extraOutputPer100Tokens;
-  
-  return baseCost + extraInputCredits + extraOutputCredits;
-}
-
-/**
- * Get action cost (legacy function, use calculateCreditsNeeded for dynamic calculation)
- */
-export function getActionCost(
-  actionType: string,
-  usePremium: boolean = false
-): number {
-  const baseCost = config.actionCosts[actionType as keyof typeof config.actionCosts] || 5;
-  return baseCost;
-}
 
 /**
  * Determine AI provider and model based on subscription tier
@@ -167,7 +137,7 @@ export function determineProvider(
  */
 export function getAIModel(subscriptionTier: string): string {
   const tier = config.subscriptionTiers[subscriptionTier as keyof typeof config.subscriptionTiers];
-  return tier?.aiModel || 'gpt-3.5-turbo';
+  return tier?.aiModel || 'llama-3.1-8b-instant';
 }
 
 

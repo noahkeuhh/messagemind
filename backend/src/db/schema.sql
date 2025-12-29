@@ -42,10 +42,19 @@ CREATE TABLE IF NOT EXISTS analyses (
   status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'done', 'failed')),
   tokens_used INTEGER DEFAULT 0,
   provider_used TEXT,
+  model_used TEXT,
   action_type TEXT CHECK (action_type IN ('short_chat', 'long_chat', 'image_analysis')),
+  mode TEXT DEFAULT 'snapshot' CHECK (mode IN ('snapshot', 'expanded', 'deep')),
+  interest_level TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Indexes for analyses table
+CREATE INDEX IF NOT EXISTS idx_analyses_provider_used ON analyses(provider_used);
+CREATE INDEX IF NOT EXISTS idx_analyses_model_used ON analyses(model_used);
+CREATE INDEX IF NOT EXISTS idx_analyses_mode ON analyses(mode);
+CREATE INDEX IF NOT EXISTS idx_analyses_interest_level ON analyses(interest_level);
 
 -- Saved replies table
 CREATE TABLE IF NOT EXISTS saved_replies (

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { CreditMeter } from "@/components/CreditMeter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -17,15 +16,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  MessageCircle,
 } from "lucide-react";
 
 const navItems = [
-  { icon: Home, label: "Nieuwe Analyse", href: "/dashboard" },
-  { icon: History, label: "Geschiedenis", href: "/dashboard/history" },
-  { icon: Bookmark, label: "Opgeslagen", href: "/dashboard/saved" },
+  { icon: Home, label: "New Analysis", href: "/dashboard" },
+  { icon: History, label: "History", href: "/dashboard/history", requiresPaid: true },
+  { icon: Bookmark, label: "Saved", href: "/dashboard/saved" },
   { icon: Award, label: "Badges", href: "/dashboard/badges" },
   { icon: CreditCard, label: "Upgrade", href: "/pricing", highlight: true },
-  { icon: Settings, label: "Instellingen", href: "/dashboard/settings" },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
 export const DashboardSidebar = () => {
@@ -38,8 +38,10 @@ export const DashboardSidebar = () => {
   const { data: creditsData } = useQuery({
     queryKey: ["credits"],
     queryFn: () => api.getCredits(),
-    refetchInterval: false,
-    staleTime: 30000,
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 10000, // Consider stale after 10 seconds
+    refetchOnMount: true, // Always refetch on mount
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const subscriptionTier = creditsData?.subscription_tier || "free";
@@ -50,7 +52,7 @@ export const DashboardSidebar = () => {
     max: "Max Plan",
   };
 
-  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Gebruiker";
+  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "User";
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleSignOut = async () => {
@@ -67,32 +69,64 @@ export const DashboardSidebar = () => {
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       className={`bg-sidebar h-screen sticky top-0 flex flex-col transition-all duration-300 ${
-        isCollapsed ? "w-20" : "w-64"
+        isCollapsed ? "w-16 sm:w-20" : "w-56 sm:w-64"
       }`}
     >
       {/* Logo */}
-      <div className="p-4 border-b border-sidebar-border">
+      <div className="h-[62px] px-4 flex items-center border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <Heart className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="relative">
+            <MessageCircle className="h-7 w-7" style={{ color: "hsl(180 85% 65%)" }} />
+            <motion.div
+              className="absolute inset-0 blur-lg"
+              style={{ background: "linear-gradient(135deg, hsl(180 85% 65%) 0%, hsl(248 73% 70%) 100%)", opacity: 0.3 }}
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.2, 0.4, 0.2],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
           </div>
           {!isCollapsed && (
-            <span className="font-bold font-display text-sidebar-foreground">
-              AI Flirt
+            <span 
+              className="font-bold font-display text-lg"
+              style={{ 
+                background: "linear-gradient(135deg, hsl(180 85% 65%) 0%, hsl(248 73% 70%) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent"
+              }}
+            >
+              MessageMind
             </span>
           )}
         </Link>
-      </div>
-
-      {/* Credit meter */}
-      <div className={`p-4 border-b border-sidebar-border ${isCollapsed ? 'hidden' : ''}`}>
-        <CreditMeter variant="compact" />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map((item) => {
           const isActive = location.pathname === item.href;
+          const isDisabled = item.requiresPaid && subscriptionTier === 'free';
+          
+          if (isDisabled) {
+            return (
+              <div
+                key={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg opacity-50 cursor-not-allowed"
+                title="Upgrade to access History"
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!isCollapsed && (
+                  <span className="font-medium">{item.label}</span>
+                )}
+              </div>
+            );
+          }
+          
           return (
             <Link
               key={item.href}

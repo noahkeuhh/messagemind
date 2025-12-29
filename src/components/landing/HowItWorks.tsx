@@ -4,22 +4,22 @@ import { Upload, Brain, MessageCircle, ArrowRight, Sparkles } from "lucide-react
 const steps = [
   {
     icon: Upload,
-    title: "Upload of paste",
-    description: "Plak haar bericht of upload een screenshot van je chat. Werkt met alle apps.",
+    title: "Upload or paste",
+    description: "Paste her message or upload a screenshot of your chat. Works with every app.",
     color: "from-accent to-rose-500",
     number: "01",
   },
   {
     icon: Brain,
-    title: "AI decodeert",
-    description: "Onze AI analyseert intentie, toon, interesse-niveau en verborgen signalen.",
+    title: "AI decodes",
+    description: "Our AI analyzes intent, tone, interest level, and hidden signals.",
     color: "from-violet-500 to-purple-600",
     number: "02",
   },
   {
     icon: MessageCircle,
-    title: "Krijg antwoorden",
-    description: "Ontvang 3 kant-en-klare antwoorden + timing advies. Copy, paste, date.",
+    title: "Get answers",
+    description: "Get 3 ready replies plus timing advice. Copy, paste, date.",
     color: "from-emerald-500 to-teal-500",
     number: "03",
   },
@@ -46,13 +46,13 @@ export const HowItWorks = () => {
             className="inline-flex items-center gap-2 bg-accent/10 text-accent px-5 py-2 rounded-full text-sm font-semibold mb-6"
           >
             <Sparkles className="h-4 w-4" />
-            Simpel proces
+            Simple flow
           </motion.span>
           <h2 className="text-4xl md:text-5xl font-bold font-display text-foreground mb-6">
-            Hoe het werkt
+            How it works
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            In 3 stappen van verwarring naar perfecte antwoorden
+            In 3 steps from confusion to perfect replies
           </p>
         </motion.div>
 

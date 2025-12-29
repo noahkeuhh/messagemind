@@ -28,7 +28,10 @@ export const config = {
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
       baseUrl: 'https://api.openai.com/v1',
-      model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+      model: process.env.OPENAI_MODEL || 'openai/gpt-oss-120b',
+    },
+    groq: {
+      apiKey: process.env.GROQ_API_KEY || '',
     },
     claude: {
       apiKey: process.env.CLAUDE_API_KEY || '',
@@ -38,7 +41,7 @@ export const config = {
     // Legacy support
     serviceKey: process.env.AI_SERVICE_KEY || '',
     serviceUrl: process.env.AI_SERVICE_URL || 'https://api.openai.com/v1',
-    model: process.env.AI_MODEL || 'gpt-4-turbo-preview',
+    model: process.env.AI_MODEL || 'openai/gpt-oss-120b',
   },
 
   // Application
@@ -48,6 +51,9 @@ export const config = {
     currency: process.env.CURRENCY || 'EUR',
     creditTokenRatio: parseInt(process.env.CREDIT_TOKEN_RATIO || '20', 10),
   },
+
+  // Frontend URL for password reset redirects
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
 
   // Admin
   admin: {
@@ -60,56 +66,87 @@ export const config = {
     dailyResetTimezone: process.env.DAILY_RESET_TIMEZONE || 'Europe/Amsterdam',
   },
 
-  // Base credits per mode (MessageMind specification)
+  // Base credits per mode (fallback when no input provided)
   baseCredits: {
-    snapshot: 5,
-    expanded: 12,
+    snapshot: 8, // Short text (≤200 chars) = 8 credits
+    expanded: 12, // Long text = 12 credits
     deep: 30,
   },
 
-  // Subscription tiers with pricing and AI model routing (updated for MessageMind)
+  // Subscription tiers with pricing and AI model routing (Production architecture)
   subscriptionTiers: {
     free: { 
-      dailyCreditsLimit: 0, // No daily credits, only monthly free analysis
-      monthlyFreeAnalyses: 1, // 1 free snapshot per month
+      dailyCreditsLimit: 0, // No daily credits, only 1 total analysis (single-use)
+      monthlyFreeAnalyses: 1, // 1 free snapshot total (single-use, not daily)
       name: 'Free',
-      priceCents: 0,
-      aiModel: 'gpt-3.5-turbo' as const,
-      provider: 'openai' as const,
+      priceCents: 0, // €0
+      aiModel: 'llama-3.3-70b-versatile' as const, // Groq llama-3.3-70b-versatile (ALL TIERS SAME)
+      provider: 'groq' as const,
       batchLimit: 1,
-      deepAllowed: false,
+      deepAllowed: false, // Free tier cannot use deep mode
+      expandedAllowed: true, // Free tier can use expanded
+      explanationAllowed: false, // Free tier cannot use explanation
     },
     pro: { 
-      dailyCreditsLimit: 100, // 3,000 credits/month
+      dailyCreditsLimit: 100, // 100 credits/day
       monthlyFreeAnalyses: 0,
       name: 'Pro',
-      priceCents: 1600, // €16/month
-      aiModel: 'gpt-3.5-turbo' as const,
-      provider: 'openai' as const,
+      priceCents: 1700, // €17/month
+      aiModel: 'llama-3.3-70b-versatile' as const, // Groq llama-3.3-70b-versatile (ALL TIERS SAME)
+      provider: 'groq' as const,
       batchLimit: 1,
-      deepAllowed: false,
+      deepAllowed: false, // Pro: deep toggle hidden in UI
+      expandedAllowed: false, // Expanded removed from Pro
+      explanationAllowed: false, // Explanation removed from Pro
+      deepCost: 12, // Deep cost exists but toggle hidden
     },
     plus: { 
-      dailyCreditsLimit: 180, // 5,400 credits/month
+      dailyCreditsLimit: 180, // 180 credits/day
       monthlyFreeAnalyses: 0,
       name: 'Plus',
-      priceCents: 3000, // €30/month
-      aiModel: 'gpt-4' as const,
-      provider: 'openai' as const,
+      priceCents: 2900, // €29/month
+      aiModel: 'llama-3.3-70b-versatile' as const, // Groq llama-3.3-70b-versatile (ALL TIERS SAME)
+      provider: 'groq' as const,
       batchLimit: 3,
-      deepAllowed: true, // Limited to 200 output tokens
+      deepAllowed: true, // Plus allows deep toggle (+12 credits)
+      expandedAllowed: false, // Plus default is expanded
+      explanationAllowed: false, // Explanation removed from Plus
+      deepCost: 12, // Extra cost for deep toggle
     },
     max: { 
-      dailyCreditsLimit: 300, // 9,000 credits/month
+      dailyCreditsLimit: 300, // 300 credits/day
       monthlyFreeAnalyses: 0,
       name: 'Max',
-      priceCents: 4900, // €49/month
-      aiModel: 'gpt-4' as const,
-      provider: 'openai' as const,
+      priceCents: 5900, // €59/month
+      aiModel: 'llama-3.3-70b-versatile' as const, // Groq llama-3.3-70b-versatile (ALL TIERS SAME)
+      provider: 'groq' as const,
       batchLimit: 10,
-      deepAllowed: true, // Unlimited
+      deepAllowed: true, // Max tier has deep mode
+      expandedAllowed: false, // Max default is deep
+      explanationAllowed: false, // Deep mode includes explanation, no toggle needed
     },
   },
+
+  /* ========== PREVIOUS SPECIFICATION (COMMENTED OUT) ==========
+  subscriptionTiers: {
+    free: { 
+      aiModel: 'llama3-8b-instant' as const,
+      provider: 'groq' as const,
+    },
+    pro: { 
+      aiModel: 'gpt-4o-mini' as const,
+      provider: 'openai' as const,
+    },
+    plus: { 
+      aiModel: 'gpt-4o-mini' as const,
+      provider: 'openai' as const,
+    },
+    max: { 
+      aiModel: 'gpt-4o' as const,
+      provider: 'openai' as const,
+    },
+  },
+  ========================================================== */
 
   // Dynamic credit scaling parameters
   creditScaling: {
@@ -117,6 +154,11 @@ export const config = {
     inputBaseThresholdChars: parseInt(process.env.INPUT_BASE_THRESHOLD_CHARS || '200', 10),
     inputChunkChars: parseInt(process.env.INPUT_CHUNK_CHARS || '100', 10),
     imageInputEquivChars: 1000, // Each image counts as 1000 chars
+    shortThresholdChars: parseInt(process.env.SHORT_THRESHOLD_CHARS || '200', 10), // Text length threshold: ≤200 = short, >200 = long
+    imageBaseCredits: parseInt(process.env.IMAGE_BASE_CREDITS || '30', 10), // Base credits per image
+    textShortCredits: parseInt(process.env.TEXT_SHORT_CREDITS || '8', 10), // Credits for short text (≤200 chars)
+    textLongCredits: parseInt(process.env.TEXT_LONG_CREDITS || '12', 10), // Credits for long text (>200 chars)
+    deepModeMultiplier: parseFloat(process.env.DEEP_MODE_MULTIPLIER || '1.2'), // Deep mode multiplier for Max tier
     
     // Output-based scaling
     outputBaselineTokens: {
@@ -141,6 +183,20 @@ export const config = {
     imageAnalysisBaseTokens: parseInt(process.env.IMAGE_ANALYSIS_BASE_TOKENS || '750', 10),
   },
 
+  // Credit top-up packs (in-app purchases) - FINAL SPECIFICATION
+  creditTopups: {
+    pack_50: {
+      credits: 50,
+      priceCents: 500, // €5
+      stripePriceId: process.env.STRIPE_PRICE_ID_TOPUP_50 || '',
+    },
+    pack_100: {
+      credits: 100,
+      priceCents: 999, // €9.99
+      stripePriceId: process.env.STRIPE_PRICE_ID_TOPUP_100 || '',
+    },
+  },
+
   // Auto refund on AI failure
   autoRefundOnFail: process.env.AUTO_REFUND_ON_FAIL === 'true' || false,
   
@@ -154,7 +210,7 @@ export const config = {
   rateLimit: {
     enabled: process.env.RATE_LIMIT_ENABLED !== 'false',
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '10', 10),
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '30', 10), // Increased from 10 to 30
   },
 } as const;
 
@@ -179,5 +235,3 @@ if (!config.supabase.serviceKey) {
 if (!config.stripe.secretKey) {
   console.warn('Warning: Stripe secret key not configured. Payment features will not work.');
 }
-
-

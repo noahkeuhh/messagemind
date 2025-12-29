@@ -47,10 +47,14 @@ router.get('/metrics', requireAdmin, async (req, res) => {
       total_analyses: metrics?.reduce((sum, m) => sum + (m.total_analyses || 0), 0) || 0,
       failed_analyses: metrics?.reduce((sum, m) => sum + (m.failed_analyses || 0), 0) || 0,
       daily_breakdown: metrics || [],
+      average_credits_per_user_per_day: 0,
+      average_revenue_per_day: 0,
+      total_revenue_cents: 0,
     };
 
     // Calculate averages
     const days = Math.max(1, Math.ceil((new Date(dateTo).getTime() - new Date(dateFrom).getTime()) / (24 * 60 * 60 * 1000)));
+    aggregated.total_revenue_cents = aggregated.revenue_cents;
     aggregated.average_credits_per_user_per_day = aggregated.total_credits_sold / Math.max(1, activeUsers || 1) / days;
     aggregated.average_revenue_per_day = aggregated.total_revenue_cents / days;
 

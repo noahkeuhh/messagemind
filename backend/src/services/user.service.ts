@@ -8,8 +8,11 @@ export interface User {
   daily_credits_limit: number;
   credits_remaining: number;
   last_reset_date: string;
+  free_trial_used_at?: string; // When the free trial was used (for Free tier)
   last_free_analysis_date?: string;
   monthly_free_analyses_used?: number;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
   created_at: string;
   metadata: Record<string, any>;
 }
@@ -29,8 +32,9 @@ export async function getUserById(userId: string): Promise<User | null> {
 }
 
 export async function createUser(userId: string, email: string, metadata?: Record<string, any>): Promise<User> {
-  const tier = metadata?.onboarding_tier || 'pro';
-  const tierConfig = config.subscriptionTiers[tier as keyof typeof config.subscriptionTiers] || config.subscriptionTiers.pro;
+  // Default every new user to the Free tier unless onboarding_tier explicitly overrides it
+  const tier = metadata?.onboarding_tier || 'free';
+  const tierConfig = config.subscriptionTiers[tier as keyof typeof config.subscriptionTiers] || config.subscriptionTiers.free;
   
   const welcomeCredits = tierConfig.dailyCreditsLimit;
 
@@ -219,7 +223,7 @@ export async function canUseFreeAnalysis(userId: string): Promise<boolean> {
 }
 
 /**
- * Mark free analysis as used
+ * Mark free analysis as used and track free_trial_used_at
  */
 export async function markFreeAnalysisUsed(userId: string): Promise<void> {
   const user = await getUserById(userId);
@@ -228,12 +232,14 @@ export async function markFreeAnalysisUsed(userId: string): Promise<void> {
   }
 
   const used = (user.monthly_free_analyses_used || 0) + 1;
+  const now = new Date().toISOString();
   
   await supabaseAdmin
     .from('users')
     .update({
       monthly_free_analyses_used: used,
-      last_free_analysis_date: new Date().toISOString(),
+      last_free_analysis_date: now,
+      free_trial_used_at: user.free_trial_used_at || now, // Track first use of free trial
     })
     .eq('id', userId);
 }

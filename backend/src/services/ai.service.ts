@@ -20,24 +20,9 @@ export async function analyzeText(
   userId?: string,
   subscriptionTier?: string
 ): Promise<AIAnalysisResult> {
-  // Check if AI is configured
-  if (!config.ai.serviceKey || config.app.nodeEnv === 'development') {
-    return getMockAnalysisResult(inputText);
-  }
-
-  try {
-    // OpenAI API call
-    if (config.ai.serviceUrl.includes('openai.com')) {
-      return await analyzeWithOpenAI(inputText, imageUrl);
-    }
-
-    // Add other AI providers here (Claude, etc.)
-    return getMockAnalysisResult(inputText);
-  } catch (error) {
-    console.error('AI analysis error:', error);
-    // Fallback to mock on error
-    return getMockAnalysisResult(inputText);
-  }
+  // Mock mode removed - all requests must use real AI providers
+  // This function is deprecated and should not be used
+  throw new Error('analyzeText is deprecated. Use callAI from ai-providers.service instead.');
 }
 
 async function analyzeWithOpenAI(
@@ -107,82 +92,6 @@ Antwoord in JSON formaat.`,
   };
 }
 
-function getMockAnalysisResult(inputText: string): AIAnalysisResult {
-  // Generate deterministic mock based on input
-  const hash = inputText.length % 3;
-  
-  const mockResults: AIAnalysisResult[] = [
-    {
-      intent: 'Geïnteresseerd, maar wil niet te eager overkomen',
-      intentLabel: 'positive',
-      toneScore: 78,
-      interestLevel: 72,
-      flags: ['Test vraag', 'Wil initiatief van jou'],
-      suggested_replies: [
-        {
-          type: 'Direct',
-          text: 'Geen misschien — laten we vrijdag om 8 uur afspreken bij [locatie]. Ik trakteer op de eerste ronde 🍷',
-        },
-        {
-          type: 'Speels',
-          text: 'Haha, "we zien wel" is niet hoe dates gepland worden 😏 Vrijdag, jij en ik, beste cocktails van de stad?',
-        },
-        {
-          type: 'Confident',
-          text: 'Ik heb dit weekend al wat gepland, maar vrijdag zou kunnen werken. Ben je rond 8 uur vrij?',
-        },
-      ],
-      recommended_timing: 'Wacht 2-4 uur voor je reageert. Laat zien dat je niet direct beschikbaar bent.',
-      tokens_used: 150,
-    },
-    {
-      intent: 'Neutraal, wachtend op meer informatie',
-      intentLabel: 'neutral',
-      toneScore: 55,
-      interestLevel: 45,
-      flags: ['Kort antwoord', 'Geen emotie'],
-      suggested_replies: [
-        {
-          type: 'Direct',
-          text: 'Oké, wat wil je dan doen?',
-        },
-        {
-          type: 'Speels',
-          text: 'Hmm, dat is niet veel info 😄 Vertel me meer!',
-        },
-        {
-          type: 'Confident',
-          text: 'Laten we iets specifieks plannen. Wat spreekt je aan?',
-        },
-      ],
-      recommended_timing: 'Reageer binnen 1-2 uur om momentum te behouden.',
-      tokens_used: 120,
-    },
-    {
-      intent: 'Mogelijk niet geïnteresseerd of afstandelijk',
-      intentLabel: 'negative',
-      toneScore: 35,
-      interestLevel: 30,
-      flags: ['Kort antwoord', 'Geen engagement', 'Mogelijk ghosting'],
-      suggested_replies: [
-        {
-          type: 'Direct',
-          text: 'Voel ik dat je niet echt geïnteresseerd bent? Geen probleem als dat zo is.',
-        },
-        {
-          type: 'Speels',
-          text: 'Oké, ik zie dat je niet super enthousiast bent. Zullen we het gewoon laten?',
-        },
-        {
-          type: 'Confident',
-          text: 'Lijkt alsof de vibe niet helemaal klopt. Geen zorgen, succes met alles!',
-        },
-      ],
-      recommended_timing: 'Wacht 4-6 uur. Als ze niet reageert, laat het gaan.',
-      tokens_used: 130,
-    },
-  ];
-
-  return mockResults[hash];
-}
+// Mock function removed - no longer used. All requests must use real AI providers.
+// REMOVED: Mock data is not allowed in production
 

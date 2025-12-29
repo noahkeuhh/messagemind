@@ -46,3 +46,5 @@ export const ProtectedRoute = ({ children, requireAuth = true }: ProtectedRouteP
   // Render children for all other cases
   return <>{children}</>;
 };
+
+export default ProtectedRoute;

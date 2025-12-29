@@ -9,28 +9,28 @@ import {
 
 const faqs = [
   {
-    question: "Is mijn data veilig en privé?",
-    answer: "Absoluut. Al je chats worden versleuteld opgeslagen en worden nooit gedeeld met derden. We zijn volledig GDPR-compliant en je kunt je data op elk moment verwijderen.",
+    question: "Is my data safe and private?",
+    answer: "Absolutely. All chats are encrypted and never shared with third parties. We are fully GDPR compliant and you can delete your data at any time.",
   },
   {
-    question: "Hoeveel credits kost een analyse?",
-    answer: "Een standaard tekstanalyse kost 5 credits. Een screenshot-analyse (met OCR) kost 10 credits. Profielfoto-analyse kost 25 credits. Met 100 credits/dag kun je ongeveer 20 korte chats analyseren.",
+    question: "How many credits does an analysis cost?",
+    answer: "A standard text analysis costs 5 credits. A screenshot analysis (with OCR) costs 10 credits. Profile photo analysis costs 25 credits. With 100 credits/day you can analyze around 20 short chats.",
   },
   {
-    question: "Werkt het met alle dating apps?",
-    answer: "Ja! Je kunt tekst plakken of screenshots uploaden van elke app: Tinder, Bumble, Hinge, Instagram DMs, WhatsApp, en meer.",
+    question: "Does it work with all dating apps?",
+    answer: "Yes! Paste text or upload screenshots from any app: Tinder, Bumble, Hinge, Instagram DMs, WhatsApp, and more.",
   },
   {
-    question: "Kan ik mijn abonnement opzeggen?",
-    answer: "Natuurlijk. Je kunt op elk moment opzeggen via je account instellingen. Je houdt toegang tot je plan tot het einde van de betaalperiode.",
+    question: "Can I cancel my subscription?",
+    answer: "Of course. You can cancel anytime in your account settings. You keep access to your plan until the end of the billing period.",
   },
   {
-    question: "Wat als ik niet tevreden ben?",
-    answer: "We bieden een 14-dagen geld-terug garantie, geen vragen gesteld. Als je niet tevreden bent, krijg je je geld volledig terug.",
+    question: "What if I'm not satisfied?",
+    answer: "We offer a 14-day money-back guarantee, no questions asked. If you're not happy, you'll get a full refund.",
   },
   {
-    question: "Hoe snel krijg ik een analyse?",
-    answer: "Analyses zijn meestal binnen 5-10 seconden klaar. Bij drukte kan dit iets langer duren, maar nooit meer dan 30 seconden.",
+    question: "How fast do I get an analysis?",
+    answer: "Analyses are usually ready within 5-10 seconds. During peak times it can take a bit longer, but never more than 30 seconds.",
   },
 ];
 
@@ -54,7 +54,7 @@ export const FAQ = () => {
             FAQ
           </motion.span>
           <h2 className="text-4xl md:text-5xl font-bold font-display text-foreground mb-4">
-            Veelgestelde vragen
+            Frequently asked questions
           </h2>
         </motion.div>
 

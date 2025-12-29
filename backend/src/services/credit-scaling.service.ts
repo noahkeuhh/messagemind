@@ -5,134 +5,199 @@ export type AnalysisMode = 'snapshot' | 'expanded' | 'deep';
 
 export interface CreditCalculationInput {
   mode: AnalysisMode;
+  tier: 'free' | 'pro' | 'plus' | 'max';
   inputText?: string;
   images?: string[];
-  usePremium?: boolean;
+  expandedToggle?: boolean; // PRO and PLUS: reused for deep toggle
+  explanationToggle?: boolean; // Removed from PRO and PLUS
   batchInputs?: any[];
-  modules?: string[];
-  deepModeRequested?: boolean;
 }
 
 export interface CreditCalculationResult {
-  totalCredits: number;
-  baseCredits: number;
-  extraInputCredits: number;
-  extraOutputCredits: number;
-  premiumFee: number;
-  moduleCosts: number;
+  totalCreditsRequired: number;
+  baseTextCredits: number;
+  baseImageCredits: number;
+  inputExtraCredits: number;
+  tierSurchargeCredits: number;
   breakdown: {
-    base: number;
+    textBase: number;
+    imageBase: number;
     inputExtra: number;
-    outputExtra: number;
-    modules: number;
-    premium: number;
-    deepMultiplier?: number;
+    tierSurcharge: number;
   };
   tokensEstimated: number;
 }
 
 /**
- * Dynamic Credit Scaling Algorithm (MessageMind specification)
+ * MESSAGEMING CREDIT SYSTEM - Per Specification
  * 
- * Stap A = BASE: base_credits per mode
- * Stap B = INPUT-BASED EXTRA: based on input length
- * Stap C = OUTPUT-ESTIMATE: based on estimated output tokens
- * Stap D = MODE/FEATURE PENALTIES: deep mode, batch, modules
- * Stap E = TOTAL: sum with multipliers
+ * BASE COSTS (all tiers):
+ *   - Short text (≤ 200 chars): 5 credits
+ *   - Long text (> 200 chars): 12 credits
+ *   - Per image: 30 credits
+ *   - Extra-long input penalty: floor(textLength / 500)
+ * 
+ * TIER-SPECIFIC RULES:
+ * 
+ * FREE:
+ *   - 1 free analysis per month (snapshot only)
+ *   - cost = baseTotal (internally tracked but not deducted)
+ *   - Cannot use Expanded, Deep, or Explanation
+ * 
+ * PRO (100 credits/day):
+ *   - Default: Snapshot only
+ *   - No toggles available
+ *   - cost = baseTotal
+ * 
+ * PLUS (180 credits/day):
+ *   - Default: short text → Snapshot, else → Expanded
+ *   - Optional Deep toggle: +12 credits
+ *   - cost = baseTotal + deepToggle(12)
+ * 
+ * MAX (300 credits/day):
+ *   - Default: images → Deep, short text → Expanded, else → Deep
+ *   - Deep cost = ceil(baseTotal * 1.2)
+ *   - No explanation toggle (Deep includes structured explanation)
  */
 export function calculateDynamicCredits(input: CreditCalculationInput): CreditCalculationResult {
   const {
     mode,
+    tier,
     inputText = '',
     images = [],
-    usePremium = false,
-    batchInputs = [],
-    modules = [],
-    deepModeRequested = false,
+    expandedToggle = false,
+    explanationToggle = false,
   } = input;
 
-  // Stap A: BASE CREDITS
-  const baseCredits = config.baseCredits[mode] || 5;
-
-  // Stap B: INPUT-BASED EXTRA
-  const inputChars = (inputText || '').length;
-  const imageEffectiveChars = images.length * config.creditScaling.imageInputEquivChars;
-  const totalInputChars = inputChars + imageEffectiveChars;
-
-  let extraInputCredits = 0;
-  if (totalInputChars > config.creditScaling.inputBaseThresholdChars) {
-    const excessChars = totalInputChars - config.creditScaling.inputBaseThresholdChars;
-    extraInputCredits = Math.ceil(excessChars / config.creditScaling.inputChunkChars);
-  }
-
-  // Stap C: OUTPUT-ESTIMATE
-  const baselineTokens = config.creditScaling.outputBaselineTokens[mode];
+  // STEP 1: Calculate base text credits
+  let baseTextCredits = 0;
+  const textLength = (inputText || '').trim().length;
   
-  // Estimate output tokens from input
-  const estimateFromInput = Math.ceil(totalInputChars / 4); // ~1 token per 4 chars
-  let initialEstimatedOutputTokens = baselineTokens + estimateFromInput;
-
-  // Add image analysis overhead
-  if (images.length > 0) {
-    initialEstimatedOutputTokens += Math.floor(
-      config.creditScaling.imageAnalysisBaseTokens / 3
-    );
+  if (textLength > 0) {
+    if (textLength <= 200) {
+      baseTextCredits = 5; // Short text
+    } else {
+      baseTextCredits = 12; // Long text
+    }
   }
 
-  // Premium upgrade increases output estimate
-  if (usePremium) {
-    initialEstimatedOutputTokens = Math.ceil(initialEstimatedOutputTokens * 1.5);
+  // STEP 2: Calculate base image credits (30 per image)
+  const baseImageCredits = (images?.length || 0) * 30;
+
+  // STEP 3: Calculate input extra penalty: floor(textLength / 500)
+  const inputExtraCredits = Math.floor(textLength / 500);
+
+  // STEP 4: Calculate base total (no fallback defaults)
+  const baseTotal = baseTextCredits + baseImageCredits + inputExtraCredits;
+
+  // FREE: always treat snapshot as costing 1 credit (tracking/display only)
+  if (tier === 'free') {
+    const imageEffectiveChars = (images?.length || 0) * 250;
+    const totalCharsForToken = textLength + imageEffectiveChars;
+    const estimateFromInput = Math.ceil(totalCharsForToken / 4);
+    const baselineTokens = 200; // Snapshot baseline
+    const tokensEstimated = baselineTokens + estimateFromInput;
+
+    return {
+      totalCreditsRequired: 1,
+      baseTextCredits: 1,
+      baseImageCredits: 0,
+      inputExtraCredits: 0,
+      tierSurchargeCredits: 0,
+      breakdown: {
+        textBase: 1,
+        imageBase: 0,
+        inputExtra: 0,
+        tierSurcharge: 0,
+      },
+      tokensEstimated,
+    };
   }
 
-  // Calculate extra output credits
-  const extraOutputTokens = Math.max(0, initialEstimatedOutputTokens - baselineTokens);
-  const extraOutputCredits = Math.ceil(extraOutputTokens / config.creditScaling.outputChunkTokens);
+  // STEP 5: Apply tier-specific surcharges
+  let tierSurchargeCredits = 0;
 
-  // Stap D: MODE/FEATURE PENALTIES
-  let moduleCosts = 0;
-  if (modules && modules.length > 0) {
-    // Each additional module costs 1 credit
-    moduleCosts = modules.length;
+  if (tier === 'plus') {
+    // PLUS: Deep toggle = +12 (using expandedToggle for deep)
+    if (expandedToggle) {
+      tierSurchargeCredits += 12;
+    }
+    // PRO: no toggles
+  } else if (tier === 'max') {
+    // MAX: Deep uses 1.2x multiplier (applied below, not as surcharge)
+    tierSurchargeCredits = 0;
   }
 
-  // Batch processing: multiply per input (no base doubling)
-  const batchCount = batchInputs.length > 0 ? batchInputs.length : 1;
-  const perInputCredits = baseCredits + extraInputCredits + extraOutputCredits + moduleCosts;
+  // STEP 6: Apply mode multipliers
+  let totalCreditsRequired = baseTotal + tierSurchargeCredits;
 
-  // Stap E: TOTAL
-  let totalCreditsRaw = perInputCredits * batchCount;
-
-  // Apply deep mode multiplier if requested
-  let deepMultiplier = 1.0;
-  if (deepModeRequested || mode === 'deep') {
-    deepMultiplier = config.creditScaling.deepMultiplier;
-    totalCreditsRaw = Math.ceil(totalCreditsRaw * deepMultiplier);
+  // MAX tier Deep mode gets 1.2x multiplier
+  if (tier === 'max' && mode === 'deep') {
+    totalCreditsRequired = Math.ceil(baseTotal * 1.2) + tierSurchargeCredits;
   }
 
-  // Add premium fee
-  const premiumFee = usePremium ? config.creditScaling.premiumFeeCredits : 0;
-  totalCreditsRaw += premiumFee;
+  // STEP 7: Estimate tokens
+  const imageEffectiveChars = (images?.length || 0) * 250;
+  const totalCharsForToken = textLength + imageEffectiveChars;
+  const estimateFromInput = Math.ceil(totalCharsForToken / 4);
+  const baselineTokens = mode === 'deep' ? 500 : (mode === 'expanded' ? 350 : 200);
+  const tokensEstimated = baselineTokens + estimateFromInput;
 
-  // Enforce minimum (at least base credits)
-  const totalCredits = Math.max(baseCredits, totalCreditsRaw);
+  console.log(`[CreditCalc] Tier=${tier}, Mode=${mode}, BaseText=${baseTextCredits}, BaseImage=${baseImageCredits}, InputExtra=${inputExtraCredits}, Surcharge=${tierSurchargeCredits}, Total=${totalCreditsRequired}`);
 
   return {
-    totalCredits,
-    baseCredits,
-    extraInputCredits,
-    extraOutputCredits,
-    premiumFee,
-    moduleCosts,
+    totalCreditsRequired,
+    baseTextCredits,
+    baseImageCredits,
+    inputExtraCredits,
+    tierSurchargeCredits,
     breakdown: {
-      base: baseCredits,
-      inputExtra: extraInputCredits,
-      outputExtra: extraOutputCredits,
-      modules: moduleCosts,
-      premium: premiumFee,
-      ...(deepMultiplier > 1.0 ? { deepMultiplier } : {}),
+      textBase: baseTextCredits,
+      imageBase: baseImageCredits,
+      inputExtra: inputExtraCredits,
+      tierSurcharge: tierSurchargeCredits,
     },
-    tokensEstimated: initialEstimatedOutputTokens,
+    tokensEstimated,
   };
+}
+
+/**
+ * Determine mode_used per spec given tier, input, and toggles
+ */
+export function determineMode(
+  tier: 'free' | 'pro' | 'plus' | 'max',
+  inputText: string | undefined,
+  hasImages: boolean,
+  expandedToggle?: boolean,
+  requestedMode?: AnalysisMode
+): AnalysisMode {
+  const textLength = (inputText || '').trim().length;
+  const isShort = textLength <= 200;
+
+  if (tier === 'free') {
+    return 'snapshot';
+  }
+
+  if (tier === 'pro') {
+    return 'snapshot'; // Pro: no toggles, always snapshot
+  }
+
+  if (tier === 'plus') {
+    if (expandedToggle) return 'deep'; // Plus: deep toggle
+    if (isShort && !hasImages) return 'snapshot';
+    return 'expanded'; // Plus default: expanded
+  }
+
+  // MAX: Allow user to choose their mode
+  // requestedMode should be passed from the API call
+  if (tier === 'max' && requestedMode) {
+    return requestedMode;
+  }
+
+  // MAX fallback (if no requestedMode provided)
+  if (hasImages) return 'deep';
+  if (isShort && !hasImages) return 'expanded';
+  return 'deep';
 }
 
 /**
@@ -143,9 +208,10 @@ export function generateAnalysisHash(
   normalizedInput: string,
   mode: AnalysisMode,
   modelVersion: string,
-  usePremium: boolean
+  expandedToggle: boolean = false,
+  explanationToggle: boolean = false
 ): string {
-  const hashInput = `${userId}|${normalizedInput}|${mode}|${modelVersion}|${usePremium}`;
+  const hashInput = `${userId}|${normalizedInput}|${mode}|${modelVersion}|${expandedToggle}|${explanationToggle}`;
   return crypto.createHash('sha256').update(hashInput).digest('hex');
 }
 
@@ -159,4 +225,3 @@ export function normalizeInputForHash(input: string): string {
     .replace(/\s+/g, ' ')
     .replace(/[^\w\s]/g, '');
 }
-

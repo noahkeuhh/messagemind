@@ -51,30 +51,84 @@ const HistoryContent = () => {
 
   const getIntentLabel = (result: any) => {
     if (!result) return "Onbekend";
-    // Support both old and new format
-    if (result.intent) return result.intent;
-    if (result.intentLabel === "positive") return "Positief";
-    if (result.intentLabel === "negative") return "Negatief";
+    // Handle both object and string formats
+    if (typeof result === 'object') {
+      return result.intent || result.intentLabel || "Onbekend";
+    }
+    return "Onbekend";
+  };
+
+  const getToneLabel = (result: any) => {
+    if (!result) return "Neutraal";
+    if (typeof result === 'object') {
+      return result.tone || "Neutraal";
+    }
     return "Neutraal";
   };
 
-  const getScore = (result: any) => {
-    if (!result) return null;
-    // Support both old and new format
-    if (result.emotional_risk) {
-      return result.emotional_risk === "low" ? "Laag" :
-             result.emotional_risk === "high" ? "Hoog" : "Medium";
+  const getInterestLevel = (result: any) => {
+    if (!result) return 0;
+    if (typeof result === 'object') {
+      const level = result.interestLevel || result.interest_level || 0;
+      return typeof level === 'string' ? parseInt(level) : level;
     }
-    return result.toneScore || result.interestLevel || null;
+    return 0;
+  };
+
+  const getEmotionalRisk = (result: any) => {
+    if (!result) return "low";
+    if (typeof result === 'object') {
+      return result.emotional_risk || "low";
+    }
+    return "low";
+  };
+
+  const getRiskBadge = (risk: string) => {
+    const badges: Record<string, { label: string; color: string }> = {
+      low: { label: "Laag risico", color: "bg-success/10 text-success" },
+      medium: { label: "Medium risico", color: "bg-warning/10 text-warning" },
+      high: { label: "Hoog risico", color: "bg-destructive/10 text-destructive" },
+    };
+    return badges[risk] || badges.low;
   };
 
   const getProviderBadge = (provider: string) => {
+    if (!provider) return { label: "Unknown", color: "bg-muted text-muted-foreground" };
+    
+    const providerLower = provider.toLowerCase();
+    
+    // Map model names to providers
+    if (providerLower.includes('gpt') || providerLower.includes('openai')) {
+      return { label: "GPT-4", color: "bg-green-500/10 text-green-500" };
+    }
+    if (providerLower.includes('claude')) {
+      return { label: "Claude", color: "bg-purple-500/10 text-purple-500" };
+    }
+    if (providerLower.includes('cohere')) {
+      return { label: "Cohere", color: "bg-blue-500/10 text-blue-500" };
+    }
+    if (providerLower.includes('llama') || providerLower.includes('groq')) {
+      return { label: "Groq", color: "bg-orange-500/10 text-orange-500" };
+    }
+    
+    // Default mapping for provider names
     const badges: Record<string, { label: string; color: string }> = {
       cohere: { label: "Cohere", color: "bg-blue-500/10 text-blue-500" },
       openai: { label: "GPT-4", color: "bg-green-500/10 text-green-500" },
       claude: { label: "Claude", color: "bg-purple-500/10 text-purple-500" },
+      groq: { label: "Groq", color: "bg-orange-500/10 text-orange-500" },
     };
-    return badges[provider] || { label: provider, color: "bg-muted text-muted-foreground" };
+    return badges[providerLower] || { label: provider, color: "bg-muted text-muted-foreground" };
+  };
+
+  const getModeBadge = (mode: string | null) => {
+    if (!mode) return null;
+    const modes: Record<string, { label: string; color: string }> = {
+      snapshot: { label: "Snapshot", color: "bg-cyan-500/10 text-cyan-500" },
+      expanded: { label: "Expanded", color: "bg-purple-500/10 text-purple-500" },
+      deep: { label: "Deep", color: "bg-pink-500/10 text-pink-500" },
+    };
+    return modes[mode] || null;
   };
 
   return (
@@ -134,9 +188,13 @@ const HistoryContent = () => {
               <div className="space-y-3">
                 {filteredHistory.map((item, index) => {
                   const result = item.analysis_result;
-                  const score = getScore(result);
                   const intent = getIntentLabel(result);
+                  const tone = getToneLabel(result);
+                  const interestLevel = getInterestLevel(result);
+                  const risk = getEmotionalRisk(result);
+                  const riskBadge = getRiskBadge(risk);
                   const providerBadge = getProviderBadge(item.provider_used || "unknown");
+                  const modeBadge = getModeBadge(item.mode);
                   
                   return (
                     <motion.div
@@ -155,17 +213,37 @@ const HistoryContent = () => {
                           <p className="text-foreground font-medium truncate">
                             "{item.input_text?.substring(0, 60) || "Geen tekst"}..."
                           </p>
-                          <div className="flex items-center gap-3 mt-1 flex-wrap">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              score >= 70 ? 'bg-success/10 text-success' :
-                              score >= 50 ? 'bg-warning/10 text-warning' :
-                              'bg-destructive/10 text-destructive'
-                            }`}>
-                              {intent} • {score}/100
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {intent && intent !== "Onbekend" && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                Intent: {intent}
+                              </span>
+                            )}
+                            {tone && tone !== "Neutraal" && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                Tone: {tone}
+                              </span>
+                            )}
+                            {interestLevel > 0 && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                Interest: {interestLevel}%
+                              </span>
+                            )}
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskBadge.color}`}>
+                              {riskBadge.label}
                             </span>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${providerBadge.color}`}>
-                              {providerBadge.label}
-                            </span>
+                            {providerBadge.label && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${providerBadge.color}`}>
+                                {providerBadge.label}
+                              </span>
+                            )}
+                            {modeBadge && (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${modeBadge.color}`}>
+                                {modeBadge.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: nl })}
@@ -228,6 +306,9 @@ const HistoryContent = () => {
             setSelectedAnalysisId(null);
           }}
           analysisId={selectedAnalysisId}
+          onAnalysisIdChange={(newAnalysisId) => {
+            setSelectedAnalysisId(newAnalysisId);
+          }}
         />
       )}
     </div>

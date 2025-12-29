@@ -69,6 +69,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Neon theme colors
+        neon: {
+          magenta: "hsl(var(--neon-magenta))",
+          pink: "hsl(var(--neon-pink))",
+          cyan: "hsl(var(--neon-cyan))",
+          purple: "hsl(var(--neon-purple))",
+          gold: "hsl(var(--neon-gold))",
+          orange: "hsl(var(--neon-orange))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -83,6 +92,10 @@ export default {
         'card-hover': 'var(--shadow-card-hover)',
         'glow': 'var(--shadow-glow)',
         'accent': 'var(--shadow-accent)',
+        'neon-magenta': '0 0 20px hsl(var(--neon-magenta) / 0.4), 0 0 40px hsl(var(--neon-magenta) / 0.2)',
+        'neon-cyan': '0 0 20px hsl(var(--neon-cyan) / 0.4), 0 0 40px hsl(var(--neon-cyan) / 0.2)',
+        'neon-gold': '0 0 20px hsl(var(--neon-gold) / 0.4), 0 0 40px hsl(var(--neon-gold) / 0.2)',
+        'neon-pulse': '0 0 30px hsl(var(--neon-magenta) / 0.3), 0 0 60px hsl(var(--neon-magenta) / 0.2)',
       },
       keyframes: {
         "accordion-down": {
@@ -114,8 +127,12 @@ export default {
           "100%": { transform: "scale(1)", opacity: "1" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(15 90% 58% / 0.3)" },
-          "50%": { boxShadow: "0 0 50px hsl(15 90% 58% / 0.5)" },
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--neon-magenta) / 0.4), 0 0 40px hsl(var(--neon-magenta) / 0.2)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--neon-magenta) / 0.6), 0 0 80px hsl(var(--neon-magenta) / 0.3)" },
+        },
+        "pulse-glow-cyan": {
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--neon-cyan) / 0.4), 0 0 40px hsl(var(--neon-cyan) / 0.2)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--neon-cyan) / 0.6), 0 0 80px hsl(var(--neon-cyan) / 0.3)" },
         },
         "float": {
           "0%, 100%": { transform: "translateY(0)" },
@@ -139,6 +156,7 @@ export default {
         "slide-in-left": "slide-in-left 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "pulse-glow-cyan": "pulse-glow-cyan 2s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
         "shimmer": "shimmer 2s linear infinite",
         "spin-slow": "spin-slow 12s linear infinite",

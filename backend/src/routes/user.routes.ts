@@ -25,12 +25,42 @@ router.get('/credits', authenticateUser, rateLimit, async (req: AuthenticatedReq
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Compute free-tier availability (1 free analysis/month)
+    let freeAnalysisAvailable = false;
+    let monthlyFreeAnalysesUsed = user.monthly_free_analyses_used || 0;
+    const freeMonthlyLimit = config.subscriptionTiers.free.monthlyFreeAnalyses;
+
+    if (user.subscription_tier === 'free') {
+      // canUseFreeAnalysis handles monthly reset logic
+      freeAnalysisAvailable = await canUseFreeAnalysis(userId);
+
+      // Refresh usage counters if a reset occurred
+      if (freeAnalysisAvailable) {
+        const refreshed = await getUserById(userId);
+        if (refreshed) {
+          monthlyFreeAnalysesUsed = refreshed.monthly_free_analyses_used || 0;
+        }
+      }
+    }
+
+    // For Free tier, surface a virtual credit so UI shows availability
+    const creditsRemaining = user.subscription_tier === 'free'
+      ? (freeAnalysisAvailable ? 1 : 0)
+      : user.credits_remaining;
+
+    const dailyLimit = user.subscription_tier === 'free'
+      ? freeMonthlyLimit
+      : user.daily_credits_limit;
+
     res.json({
       user_id: user.id,
-      credits_remaining: user.credits_remaining,
-      daily_limit: user.daily_credits_limit,
+      credits_remaining: creditsRemaining,
+      daily_limit: dailyLimit,
       last_reset_date: user.last_reset_date,
       subscription_tier: user.subscription_tier,
+      free_analysis_available: freeAnalysisAvailable,
+      monthly_free_analyses_used: monthlyFreeAnalysesUsed,
+      monthly_free_analyses_limit: freeMonthlyLimit,
     });
   } catch (error: any) {
     console.error('Error fetching credits:', error);
@@ -46,15 +76,16 @@ import {
   type AnalysisMode 
 } from '../services/credit-scaling.service.js';
 import { processAnalysisJob } from '../services/analysis-processor.service.js';
+import { routeModel, type ModelName } from '../services/model-routing.service.js';
+import { badgeService } from '../services/badge.service.js';
 
 const actionSchema = z.object({
   user_id: z.string().uuid().optional(),
   input_text: z.string().optional(),
   images: z.array(z.string().url()).optional(),
   mode: z.enum(['snapshot', 'expanded', 'deep']),
-  use_premium: z.boolean().optional().default(false),
-  modules: z.array(z.string()).optional().default([]),
-  batch_inputs: z.array(z.any()).optional().default([]),
+  expandedToggle: z.boolean().optional().default(false),
+  explanationToggle: z.boolean().optional().default(false),
   idempotency_key: z.string().uuid().optional(),
   recompute: z.boolean().optional().default(false),
 });
@@ -71,10 +102,9 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
     const { 
       input_text, 
       images = [], 
-      mode, 
-      use_premium = false, 
-      modules = [], 
-      batch_inputs = [],
+      mode: requestedMode, 
+      expandedToggle = false,
+      explanationToggle = false,
       recompute = false,
     } = validation.data;
 
@@ -82,6 +112,15 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
     if (!input_text && (!images || images.length === 0)) {
       return res.status(400).json({ 
         error: 'Either input_text or images array is required' 
+      });
+    }
+
+    // Image upload restriction: only Plus and Max tiers
+    if (images && images.length > 0 && (user.subscription_tier === 'free' || user.subscription_tier === 'pro')) {
+      return res.status(403).json({
+        error: 'upgrade_required',
+        message: 'Image analysis requires Plus or Max tier. Upgrade to analyze screenshots.',
+        type: 'image_upload_restricted'
       });
     }
 
@@ -118,79 +157,98 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       return res.status(400).json({ error: 'Invalid subscription tier' });
     }
 
-    // Check batch limit
-    const batchCount = batch_inputs.length > 0 ? batch_inputs.length : 1;
-    if (batchCount > tier.batchLimit) {
-      return res.status(403).json({
-        error: 'batch_limit_exceeded',
-        message: `Your tier allows max ${tier.batchLimit} batch inputs. Upgrade to increase limit.`,
-        current_limit: tier.batchLimit,
-        requested: batchCount,
-      });
-    }
-
-    // Check deep mode access
-    if (mode === 'deep' && !tier.deepAllowed) {
-      return res.status(403).json({
-        error: 'deep_mode_not_allowed',
-        message: 'Deep mode requires Plus or Max tier. Upgrade to access.',
-      });
-    }
-
-    // Check Free tier monthly limit
+    // FREE tier restrictions
     const isFreeTier = user.subscription_tier === 'free';
     let canUseFree = false;
     if (isFreeTier) {
-      // Free tier only allows snapshot mode
-      if (mode !== 'snapshot') {
+      // FREE can only use snapshot; expanded/deep require upgrade
+      if (requestedMode !== 'snapshot') {
         return res.status(403).json({
-          error: 'mode_not_allowed',
-          message: 'Free tier only supports snapshot mode. Upgrade for expanded/deep modes.',
+          error: 'upgrade_required',
+          type: 'upgrade_required',
+          message: 'Upgrade required to unlock Expanded Analysis, Explanation and Deep Mode.',
         });
       }
+      // Monthly single analysis
       canUseFree = await canUseFreeAnalysis(userId);
       if (!canUseFree) {
         return res.status(402).json({
-          error: 'monthly_limit_reached',
-          message: 'Je hebt je maandelijkse gratis analyse al gebruikt. Upgrade naar Pro voor meer analyses.',
+          error: 'free_trial_exhausted',
+          message: 'Your free monthly analysis has been used. Upgrade to continue.',
           credits_needed: 0,
           credits_remaining: 0,
         });
       }
     }
 
-    // Determine provider and model
-    let provider: 'openai' = 'openai';
-    let model = tier.aiModel;
-    
-    // Override: snapshot always uses GPT-3.5 (cost control)
-    if (mode === 'snapshot') {
-      model = 'gpt-3.5-turbo';
-    }
-    
-    // Override: use_premium forces GPT-4
-    if (use_premium) {
-      model = 'gpt-4';
+    // Deep mode access: Pro, Plus, and Max tiers (not Free)
+    if (requestedMode === 'deep' && user.subscription_tier === 'free') {
+      return res.status(403).json({
+        error: 'deep_mode_not_allowed',
+        message: 'Deep mode requires Pro, Plus, or Max tier. Upgrade to access.',
+      });
     }
 
-    // Calculate credits using dynamic scaling
+    // Check daily credit limit for paid tiers
+    if (!isFreeTier) {
+      if (user.credits_remaining < 1) {
+        return res.status(402).json({
+          error: 'insufficient_credits',
+          message: `You have reached your daily credit limit (${tier.dailyCreditsLimit} credits/day). Credits reset daily.`,
+          credits_needed: 1,
+          credits_remaining: user.credits_remaining,
+        });
+      }
+    }
+
+    // Route model based on tier and input type
+    const routing = routeModel(
+      user.subscription_tier as 'free' | 'pro' | 'plus' | 'max',
+      requestedMode,
+      inputText || '',
+      images.length > 0,
+      { expandedToggle }
+    );
+    
+    const model: ModelName = routing.model;
+    const actualMode: AnalysisMode = routing.mode;
+    const provider = routing.provider;
+    
+    console.log(`[API] Model routing: ${model}, Mode: ${actualMode}, Provider: ${provider}`);
+    console.log(`[API] LIVE AI CALL - Model: ${model}, Mode: ${actualMode}`);
+
+    // Calculate credits using dynamic scaling (tier-aware for new cost policy)
+    console.log(`[API] Calculating credits for mode: ${routing.mode}, hasText: ${!!inputText}, hasImages: ${images.length > 0}`);
     const creditCalc = calculateDynamicCredits({
-      mode,
+      mode: actualMode,
+      tier: user.subscription_tier as 'free' | 'pro' | 'plus' | 'max',
       inputText,
       images,
-      usePremium: use_premium,
-      batchInputs: batch_inputs,
-      modules,
-      deepModeRequested: mode === 'deep',
+      expandedToggle,
+      explanationToggle,
     });
 
-    const totalCredits = creditCalc.totalCredits;
+    const totalCredits = creditCalc.totalCreditsRequired;
+    console.log(`[API] Credit calculation complete: ${totalCredits} total credits (breakdown:`, creditCalc.breakdown, ')');
     const creditsToDeduct = isFreeTier && canUseFree ? 0 : totalCredits;
+    
+    // Check if user has enough credits (after calculation, before deduction)
+    if (!isFreeTier || !canUseFree) {
+      if (user.credits_remaining < creditsToDeduct) {
+        return res.status(402).json({
+          error: 'insufficient_credits',
+          message: 'Not enough credits to perform this analysis',
+          credits_needed: creditsToDeduct,
+          credits_remaining: user.credits_remaining,
+          breakdown: creditCalc.breakdown,
+        });
+      }
+    }
 
-    // Check cache (if not recomputing)
+    // Check cache (if not recomputing) - use actual mode and model from routing
     if (!recompute && config.cache.enabled) {
       const normalizedInput = normalizeInputForHash(inputText);
-      const analysisHash = generateAnalysisHash(userId, normalizedInput, mode, model, use_premium);
+      const analysisHash = generateAnalysisHash(userId, normalizedInput, actualMode, model, expandedToggle, explanationToggle);
       
       const { data: cachedAnalysis } = await supabaseAdmin
         .from('analyses')
@@ -205,44 +263,36 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
 
       if (cachedAnalysis) {
         // Return cached result (no charge)
+        console.log(`[API] Returning cached analysis ${cachedAnalysis.id} for user ${userId}`);
         return res.json({
           analysis_id: cachedAnalysis.id,
           status: 'done',
           analysis_json: cachedAnalysis.analysis_json,
           credits_charged: 0,
           credits_remaining: user.credits_remaining,
+          provider_used: (cachedAnalysis as any).model_version || (cachedAnalysis as any).provider_used || model, // Use stored provider/model
+          mode_used: (cachedAnalysis as any).mode || actualMode, // Use stored mode
           cached: true,
           message: 'Cached result (no credits charged)',
         });
       }
     }
 
-    // Check if user has enough credits (skip for free tier monthly analysis)
-    if (!isFreeTier || !canUseFree) {
-      if (user.credits_remaining < creditsToDeduct) {
-        return res.status(402).json({
-          error: 'insufficient_credits',
-          message: 'Niet genoeg credits om deze analyse uit te voeren',
-          credits_needed: creditsToDeduct,
-          credits_remaining: user.credits_remaining,
-          breakdown: creditCalc.breakdown,
-        });
-      }
-    }
 
-    // Atomic credit deduction (skip for free tier monthly analysis)
+    // Atomic credit deduction BEFORE model call (skip for free tier test)
     let creditsResult;
     if (creditsToDeduct > 0) {
       try {
+        console.log(`[API] CREDITS DEDUCTED: ${creditsToDeduct} credits before AI call`);
         creditsResult = await atomicCreditDeduction(
           userId,
           -creditsToDeduct,
           'action_spend',
           {
-            mode,
-            modules,
-            batch_count: batchCount,
-            use_premium: use_premium,
+            mode: actualMode,
+            model_used: model,
+            expanded_toggle: expandedToggle,
+            explanation_toggle: explanationToggle,
             breakdown: creditCalc.breakdown,
           }
         );
@@ -250,7 +300,7 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
         if (error.message === 'INSUFFICIENT_CREDITS') {
           return res.status(402).json({
             error: 'insufficient_credits',
-            message: 'Niet genoeg credits om deze analyse uit te voeren',
+            message: 'Not enough credits to perform this analysis',
             credits_needed: creditsToDeduct,
             credits_remaining: user.credits_remaining,
             breakdown: creditCalc.breakdown,
@@ -264,34 +314,28 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       creditsResult = { success: true, credits_remaining: user.credits_remaining };
     }
 
-    // Generate analysis hash
+    // Generate analysis hash (use actual mode and model from routing)
     const normalizedInput = normalizeInputForHash(inputText);
-    const analysisHash = generateAnalysisHash(userId, normalizedInput, mode, model, use_premium);
+    const analysisHash = generateAnalysisHash(userId, normalizedInput, actualMode, model, expandedToggle, explanationToggle);
 
     // Create analysis record (with fallback for missing columns)
     const analysisData: any = {
       user_id: userId,
       input_text: inputText || null,
       image_url: images.length > 0 ? images[0] : null,
-      action_type: mode === 'snapshot' ? 'short_chat' : mode === 'expanded' ? 'long_chat' : 'image_analysis', // Legacy field
-      provider_used: provider,
+      action_type: actualMode === 'snapshot' ? 'short_chat' : actualMode === 'expanded' ? 'long_chat' : 'image_analysis', // Legacy field
+      provider_used: provider === 'groq' ? 'groq-llama3-8b' : model, // Groq returns groq-llama3-8b, OpenAI returns model name
       credits_used: creditsToDeduct,
       status: 'queued',
     };
 
-    // Add new MessageMind fields if they exist (after migration)
-    try {
-      analysisData.mode = mode;
-      analysisData.model_version = model;
-      analysisData.tokens_estimated = creditCalc.tokensEstimated;
-      analysisData.analysis_hash = analysisHash;
-      analysisData.use_premium = use_premium;
-      analysisData.batch_count = batchCount;
-      analysisData.modules = modules;
-    } catch (e) {
-      // Fields don't exist yet - will use legacy fields
-      console.warn('New MessageMind fields not available, using legacy format');
-    }
+    // Add new MessageMind fields (use actual mode and model from routing)
+    analysisData.mode = actualMode;
+    analysisData.model_version = model;
+    analysisData.tokens_estimated = creditCalc.tokensEstimated;
+    analysisData.analysis_hash = analysisHash;
+    analysisData.expanded_toggle = expandedToggle;
+    analysisData.explanation_toggle = explanationToggle;
 
     const { data: analysis, error: analysisError } = await supabaseAdmin
       .from('analyses')
@@ -303,7 +347,7 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       console.error('Failed to create analysis:', analysisError);
       console.error('Analysis data attempted:', {
         user_id: userId,
-        mode,
+        mode: actualMode,
         has_new_fields: 'mode' in analysisData,
       });
       
@@ -344,28 +388,38 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
       });
     }
 
-    // Process analysis asynchronously
+    console.log(`[API] Analysis ${analysis.id} queued for user ${userId}, mode: ${actualMode}, credits: ${creditsToDeduct}, provider: ${provider}, model: ${model}`);
+
+    // Process analysis asynchronously with routed model and mode
+    // Don't await - let it run in background
     processAnalysisJob(
       analysis.id,
       inputText,
       images,
-      mode,
+      actualMode, // Use actual mode from routing
       provider,
-      model,
+      model, // Use routed model
       userId,
       user.subscription_tier,
       creditsToDeduct,
-      creditsResult.transaction_id
+      creditsResult.transaction_id,
+      { expandedToggle, explanationToggle }
     ).catch(error => {
-      console.error('Error processing analysis:', error);
-      // Handle failure in processor
+      console.error(`[API] Error processing analysis ${analysis.id}:`, error);
+      console.error(`[API] Error details:`, {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Error handling is done in processAnalysisJob - it will update status to 'failed'
     });
 
-    // Return 202 Accepted
+    // Return 202 Accepted with production format
     res.status(202).json({
       analysis_id: analysis.id,
       credits_charged: creditsToDeduct,
       credits_remaining: creditsResult.credits_remaining,
+      provider_used: provider === 'groq' ? 'groq-llama3-8b' : model, // Groq returns groq-llama3-8b, OpenAI returns model name
+      mode_used: actualMode, // Include actual mode used
       queued: true,
       status: 'queued',
       breakdown: creditCalc.breakdown,
@@ -380,7 +434,7 @@ router.post('/action', authenticateUser, rateLimit, idempotencyCheck, async (req
 const upgradePromptSchema = z.object({
   user_id: z.string().uuid().optional(),
   analysis_id: z.string().uuid(),
-  target_provider: z.enum(['GPT-4', 'gpt-4']).optional().default('GPT-4'),
+  target_provider: z.enum(['openai/gpt-oss-120b']).optional().default('openai/gpt-oss-120b'),
   extra_credits: z.number().optional(),
 });
 
@@ -432,7 +486,7 @@ router.post('/upgrade_prompt', authenticateUser, rateLimit, async (req: Authenti
     if (user.credits_remaining < upgradeCost) {
       return res.status(402).json({
         error: 'insufficient_credits',
-        message: 'Niet genoeg credits om te upgraden naar GPT-4',
+        message: 'Niet genoeg credits om te upgraden',
         credits_needed: upgradeCost,
         credits_remaining: user.credits_remaining,
       });
@@ -450,19 +504,19 @@ router.post('/upgrade_prompt', authenticateUser, rateLimit, async (req: Authenti
       }
     );
 
-    // Re-run analysis with GPT-4
+    // Re-run analysis with openai/gpt-oss-120b
     const inputText = analysis.input_text || '';
     const images = analysis.image_url ? [analysis.image_url] : [];
     const mode = (analysis.mode as AnalysisMode) || 'expanded';
 
-    // Process with GPT-4
+    // Process with openai/gpt-oss-120b
     await processAnalysisJob(
       analysis_id,
       inputText,
       images,
       mode,
-      'openai',
-      'gpt-4',
+      'openai' as any,
+      'openai/gpt-oss-120b',
       userId,
       user.subscription_tier,
       upgradeCost,
@@ -474,8 +528,7 @@ router.post('/upgrade_prompt', authenticateUser, rateLimit, async (req: Authenti
       .from('analyses')
       .update({
         status: 'queued',
-        use_premium: true,
-        model_version: 'gpt-4',
+        model_version: 'llama-3.3-70b-versatile',
         credits_used: (analysis.credits_used || 0) + upgradeCost,
       })
       .eq('id', analysis_id);
@@ -485,7 +538,7 @@ router.post('/upgrade_prompt', authenticateUser, rateLimit, async (req: Authenti
       status: 'queued',
       credits_charged: upgradeCost,
       credits_remaining: creditsResult.credits_remaining,
-      message: 'Analysis upgraded to GPT-4 and queued for processing',
+      message: 'Analysis upgraded and queued for processing',
     });
   } catch (error: any) {
     console.error('Error in upgrade_prompt endpoint:', error);
@@ -618,7 +671,7 @@ router.get('/history', authenticateUser, async (req: AuthenticatedRequest, res) 
 
     const { data: analyses, error, count } = await supabaseAdmin
       .from('analyses')
-      .select('id, input_text, image_url, status, credits_used, created_at, analysis_result, provider_used', { count: 'exact' })
+      .select('id, input_text, image_url, status, credits_used, created_at, analysis_result, provider_used, mode', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -633,6 +686,23 @@ router.get('/history', authenticateUser, async (req: AuthenticatedRequest, res) 
     });
   } catch (error: any) {
     console.error('Error fetching history:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// GET /api/user/badges
+router.get('/badges', authenticateUser, rateLimit, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    
+    const badges = await badgeService.getUserBadges(userId);
+    
+    res.json({
+      unlocked: badges.unlocked,
+      locked: badges.locked,
+    });
+  } catch (error: any) {
+    console.error('Error fetching badges:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
@@ -798,11 +868,18 @@ router.delete('/', authenticateUser, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// GET /api/user/analysis/:id (MessageMind format)
+// GET /api/user/analysis/:id (Production format)
 router.get('/analysis/:id', authenticateUser, async (req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
     const analysisId = req.params.id;
+    if (!analysisId) {
+      return res.status(400).json({ error: 'Analysis ID is required' });
+    }
 
     const { data: analysis, error } = await supabaseAdmin
       .from('analyses')
@@ -812,22 +889,49 @@ router.get('/analysis/:id', authenticateUser, async (req: AuthenticatedRequest, 
       .single();
 
     if (error || !analysis) {
+      console.error(`[API] Analysis ${analysisId} not found for user ${userId}:`, error);
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    // Return in MessageMind format
-    res.json({
+    // Get current user credits (with error handling)
+    let currentCredits = 0;
+    try {
+      const user = await getUserById(userId);
+      currentCredits = user?.credits_remaining || 0;
+    } catch (userError) {
+      console.error(`[API] Error fetching user ${userId} for analysis ${analysisId}:`, userError);
+      // Continue with 0 credits if user fetch fails
+      currentCredits = 0;
+    }
+
+    // Return in production format
+    const response: any = {
       status: analysis.status,
       analysis_json: analysis.analysis_json || analysis.analysis_result,
-      provider_used: analysis.provider_used,
-      credits_charged: analysis.credits_used,
-      tokens_actual: analysis.tokens_actual || analysis.tokens_used,
-      mode: analysis.mode,
+      credits_charged: analysis.credits_used || 0,
+      credits_remaining: currentCredits,
+      provider_used: (analysis as any).model_version || analysis.provider_used || 'openai',
+      mode_used: (analysis as any).mode || (analysis as any).mode_used || 'snapshot',
+      tokens_actual: analysis.tokens_actual || analysis.tokens_used || 0,
       created_at: analysis.created_at,
       updated_at: analysis.updated_at,
-    });
+      input_text: analysis.input_text,
+      image_url: analysis.image_url,
+    };
+    
+    // Include error message if analysis failed
+    if (analysis.status === 'failed' && (analysis as any).error_message) {
+      response.error_message = (analysis as any).error_message;
+    }
+    
+    res.json(response);
   } catch (error: any) {
-    console.error('Error fetching analysis:', error);
+    console.error('[API] Error fetching analysis:', {
+      error: error.message,
+      stack: error.stack,
+      analysisId: req.params.id,
+      userId: req.user?.id,
+    });
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });

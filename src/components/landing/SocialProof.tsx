@@ -2,29 +2,29 @@ import { motion } from "framer-motion";
 import { Star, Quote, TrendingUp, Users, MessageSquare, Zap } from "lucide-react";
 
 const stats = [
-  { value: "1.000+", label: "Actieve gebruikers", icon: Users, color: "from-accent to-rose-500" },
-  { value: "85%", label: "Meer dates", icon: TrendingUp, color: "from-emerald-500 to-teal-500" },
-  { value: "50K+", label: "Chats geanalyseerd", icon: MessageSquare, color: "from-violet-500 to-purple-600" },
-  { value: "4.8/5", label: "Gebruikersscore", icon: Star, color: "from-amber-500 to-orange-500" },
+  { value: "1,000+", label: "Active users", icon: Users, color: "from-accent to-rose-500" },
+  { value: "85%", label: "More dates", icon: TrendingUp, color: "from-emerald-500 to-teal-500" },
+  { value: "50K+", label: "Chats analyzed", icon: MessageSquare, color: "from-violet-500 to-purple-600" },
+  { value: "4.8/5", label: "User rating", icon: Star, color: "from-amber-500 to-orange-500" },
 ];
 
 const testimonials = [
   {
-    quote: "Eindelijk snap ik wat ze bedoelt. De antwoorden zijn spot-on!",
+    quote: "I finally get what she means. The replies are spot on!",
     author: "Mark, 28",
     role: "Software Developer",
     rating: 5,
     avatar: "M",
   },
   {
-    quote: "Van awkward texts naar smooth gesprekken. Game changer.",
+    quote: "From awkward texts to smooth conversations. Game changer.",
     author: "Thomas, 32",
     role: "Sales Manager",
     rating: 5,
     avatar: "T",
   },
   {
-    quote: "De AI pikt nuances op die ik zelf mis. Onmisbaar geworden.",
+    quote: "The AI catches nuances I miss myself. It became indispensable.",
     author: "Jasper, 25",
     role: "Marketing Specialist",
     rating: 5,
@@ -79,10 +79,10 @@ export const SocialProof = () => {
             Testimonials
           </motion.span>
           <h2 className="text-4xl md:text-5xl font-bold font-display text-foreground mb-6">
-            Wat gebruikers zeggen
+            What users say
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Duizenden mannen gebruiken AI Flirt Translator om betere gesprekken te voeren
+            Thousands use MessageMind to get clarity on their conversations
           </p>
         </motion.div>
 

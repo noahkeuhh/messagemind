@@ -15,12 +15,12 @@ const plans = [
     price: "25",
     credits: "100",
     icon: Zap,
-    description: "Genoeg voor 20 korte chats per dag",
+    description: "Enough for 20 short chats per day",
     features: [
-      "100 credits/dag",
-      "Intent & tone analyse",
+      "100 credits/day",
+      "Intent & tone analysis",
       "3 reply templates",
-      "Chat geschiedenis",
+      "Chat history",
     ],
     popular: false,
     color: "from-blue-500 to-cyan-500",
@@ -31,12 +31,12 @@ const plans = [
     price: "35",
     credits: "200",
     icon: Crown,
-    description: "Dubbele vrijheid + prioriteit support",
+    description: "Double the freedom + priority support",
     features: [
-      "200 credits/dag",
-      "Alles van Pro",
-      "Prioriteit support",
-      "Geavanceerde analyses",
+      "200 credits/day",
+      "Everything in Pro",
+      "Priority support",
+      "Advanced analyses",
     ],
     popular: true,
     color: "from-accent to-rose-500",
@@ -47,12 +47,12 @@ const plans = [
     price: "50",
     credits: "300",
     icon: Gem,
-    description: "Onbeperkte mogelijkheden + exclusieve content",
+    description: "Unlimited potential + exclusive content",
     features: [
-      "300 credits/dag",
-      "Alles van Max",
-      "Exclusieve content",
-      "1-op-1 advies sessie",
+      "300 credits/day",
+      "Everything in Max",
+      "Exclusive content",
+      "1-on-1 coaching session",
     ],
     popular: false,
     color: "from-violet-500 to-purple-600",
@@ -94,10 +94,10 @@ export const PricingTeaser = ({ onSubscribeClick }: PricingTeaserProps) => {
             Pricing
           </motion.span>
           <h2 className="text-4xl md:text-5xl font-bold font-display text-foreground mb-6">
-            Kies je plan
+            Choose your plan
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Start vandaag met betere gesprekken. Alle plannen met geld-terug garantie.
+            Start today with better conversations. Every plan comes with a money-back guarantee.
           </p>
         </motion.div>
 
@@ -118,7 +118,7 @@ export const PricingTeaser = ({ onSubscribeClick }: PricingTeaserProps) => {
             >
               {plan.popular && (
                 <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-accent to-rose-500 text-white text-sm font-bold px-6 py-2 rounded-full shadow-lg">
-                  Meest gekozen
+                  Most popular
                 </span>
               )}
 
@@ -133,14 +133,14 @@ export const PricingTeaser = ({ onSubscribeClick }: PricingTeaserProps) => {
 
               <div className="mb-8">
                 <span className="text-5xl font-bold font-display">€{plan.price}</span>
-                <span className={`text-sm ${plan.popular ? 'text-white/70' : 'text-muted-foreground'}`}>/maand</span>
+                <span className={`text-sm ${plan.popular ? 'text-white/70' : 'text-muted-foreground'}`}>/month</span>
               </div>
 
               <div className={`flex items-center gap-3 mb-8 p-4 rounded-2xl ${
                 plan.popular ? 'bg-white/10' : 'bg-accent/5'
               }`}>
                 <Zap className={`h-5 w-5 ${plan.popular ? 'text-amber-400' : 'text-accent'}`} />
-                <span className="font-bold text-lg">{plan.credits} credits/dag</span>
+                <span className="font-bold text-lg">{plan.credits} credits/day</span>
               </div>
 
               <ul className="space-y-4 mb-8">

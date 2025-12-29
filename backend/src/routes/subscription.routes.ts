@@ -10,7 +10,7 @@ const router = Router();
 
 // POST /api/user/subscribe
 const subscribeSchema = z.object({
-  tier: z.enum(['pro', 'max', 'vip']),
+  tier: z.enum(['free', 'pro', 'plus', 'max']),
   interval: z.enum(['month', 'year']).default('month'),
 });
 
@@ -57,22 +57,35 @@ router.post('/subscribe', authenticateUser, async (req: AuthenticatedRequest, re
       });
     }
 
-    const subscription = await stripe.subscriptions.create({
+    // Create Stripe Checkout Session for subscription
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      items: [{ price: priceId }],
+      mode: 'subscription',
+      payment_method_types: ['card', 'ideal'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: `${frontendUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/pricing`,
       metadata: {
         user_id: userId,
         tier: tier,
       },
-      payment_behavior: 'default_incomplete',
-      payment_settings: { save_default_payment_method: 'on_subscription' },
-      expand: ['latest_invoice.payment_intent'],
+      subscription_data: {
+        metadata: {
+          user_id: userId,
+          tier: tier,
+        },
+      },
     });
 
     res.json({
-      subscription_id: subscription.id,
-      client_secret: (subscription.latest_invoice as any)?.payment_intent?.client_secret,
-      status: subscription.status,
+      checkout_url: session.url,
+      session_id: session.id,
     });
   } catch (error: any) {
     console.error('Error creating subscription:', error);

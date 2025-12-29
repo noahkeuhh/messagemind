@@ -34,9 +34,9 @@ export async function deductCredits(
   );
 }
 
-export function getActionCost(actionType: string): number {
-  return config.actionCosts[actionType as keyof typeof config.actionCosts] || 5;
-}
+/**
+ * Legacy: Use calculateDynamicCredits from credit-scaling.service.ts instead
+ */
 
 
 

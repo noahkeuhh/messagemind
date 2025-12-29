@@ -9,17 +9,16 @@ import { useQueryClient } from "@tanstack/react-query";
 interface BuyCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentTier?: "free" | "pro" | "plus" | "max";
 }
 
 const creditPacks = [
   { id: "pack_50", credits: 50, price: 5, popular: false },
-  { id: "pack_120", credits: 120, price: 10, popular: true, bonus: "+20 bonus" },
-  { id: "pack_200", credits: 200, price: 15, popular: false },
-  { id: "pack_300", credits: 300, price: 20, popular: false, bonus: "+50 bonus" },
+  { id: "pack_100", credits: 100, price: 9.99, popular: true },
 ];
 
-export const BuyCreditsModal = ({ isOpen, onClose }: BuyCreditsModalProps) => {
-  const [selectedPack, setSelectedPack] = useState<string | null>("pack_120");
+export const BuyCreditsModal = ({ isOpen, onClose, currentTier = "free" }: BuyCreditsModalProps) => {
+  const [selectedPack, setSelectedPack] = useState<string | null>("pack_100");
   
   // Fetch available packs from API (optional - for dynamic pricing)
   // For now using static list
@@ -53,7 +52,7 @@ export const BuyCreditsModal = ({ isOpen, onClose }: BuyCreditsModalProps) => {
   };
 
   const handleClose = () => {
-    setSelectedPack("pack_120");
+    setSelectedPack("pack_100");
     setIsLoading(false);
     // Refresh credits when modal closes (in case payment was successful)
     queryClient.invalidateQueries({ queryKey: ["credits"] });
@@ -88,7 +87,7 @@ export const BuyCreditsModal = ({ isOpen, onClose }: BuyCreditsModalProps) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md"
           onClick={handleClose}
         >
           <motion.div
@@ -96,118 +95,160 @@ export const BuyCreditsModal = ({ isOpen, onClose }: BuyCreditsModalProps) => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            className="card-glass rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10"
           >
-            {/* Header */}
-            <div className="relative bg-gradient-hero p-6">
+            {/* Header with gradient */}
+            <div className="relative p-8 text-center bg-gradient-to-br from-accent/10 via-transparent to-primary/10">
               <button
                 onClick={handleClose}
-                className="absolute top-4 right-4 text-primary-foreground/70 hover:text-primary-foreground transition-colors"
+                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors p-1 hover:bg-muted/20 rounded-lg"
               >
                 <X className="h-5 w-5" />
               </button>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
-                  <Zap className="h-6 w-6 text-accent-foreground" />
+
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
+                className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/15 border border-accent/40 flex items-center justify-center mx-auto mb-5 shadow-lg"
+              >
+                <Zap className="h-10 w-10 text-accent" />
+              </motion.div>
+
+              <h2 className="text-2xl font-bold font-display text-foreground mb-2">
+                Buy Credit Packs
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                Get extra credits for more analyses
+              </p>
+              {currentTier !== "free" && (
+                <div className="mt-3 inline-block px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold uppercase">
+                  {currentTier === "pro" && "Pro Tier"}
+                  {currentTier === "plus" && "Plus Tier ⭐"}
+                  {currentTier === "max" && "Max Tier 👑"}
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold font-display text-primary-foreground">
-                    Buy credits
-                  </h2>
-                  <p className="text-primary-foreground/70 text-sm">
-                    Extra credits for more analyses
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Packs */}
             <div className="p-6 space-y-3">
-              {creditPacks.map((pack) => (
-                <button
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
+                Choose Your Pack
+              </p>
+              {creditPacks.map((pack, index) => (
+                <motion.button
                   key={pack.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
                   onClick={() => setSelectedPack(pack.id)}
-                  className={`w-full p-4 rounded-xl border-2 transition-all text-left relative ${
+                  className={`w-full p-5 rounded-2xl border-2 transition-all text-left relative group ${
                     selectedPack === pack.id
-                      ? "border-accent bg-accent/5"
-                      : "border-border hover:border-accent/50"
+                      ? "border-accent bg-accent/10 shadow-lg scale-[1.02]"
+                      : "border-white/10 hover:border-accent/40 bg-muted/20 hover:bg-muted/30 hover:scale-[1.01]"
                   }`}
                 >
                   {pack.popular && (
-                    <span className="absolute -top-2 right-4 bg-accent text-accent-foreground text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="absolute -top-2.5 right-4 px-3 py-1 rounded-full bg-gradient-to-r from-primary to-accent text-white text-xs font-bold flex items-center gap-1 shadow-lg">
                       <Sparkles className="h-3 w-3" />
-                      Populair
+                      Most Popular
                     </span>
                   )}
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        selectedPack === pack.id ? "bg-accent/10" : "bg-muted"
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center border-2 transition-all ${
+                        selectedPack === pack.id 
+                          ? "bg-gradient-to-br from-primary/20 to-accent/15 border-accent/50" 
+                          : "bg-muted/50 border-white/10 group-hover:border-accent/30"
                       }`}>
-                        <Zap className={`h-5 w-5 ${
-                          selectedPack === pack.id ? "text-accent" : "text-muted-foreground"
+                        <Zap className={`h-7 w-7 transition-colors ${
+                          selectedPack === pack.id ? "text-accent" : "text-muted-foreground group-hover:text-accent"
                         }`} />
                       </div>
                       <div>
-                        <p className="font-semibold text-foreground">
-                          {pack.credits} credits
-                          {pack.bonus && (
-                            <span className="text-success text-sm ml-2">{pack.bonus}</span>
-                          )}
+                        <p className="font-bold text-foreground text-lg">
+                          {pack.credits} Credits
                         </p>
                         <p className="text-sm text-muted-foreground">
                           ≈ {Math.floor(pack.credits / 5)} analyses
                         </p>
                       </div>
                     </div>
-                    <p className="text-xl font-bold text-foreground">€{pack.price}</p>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-foreground">€{pack.price}</p>
+                      <p className="text-xs text-muted-foreground">
+                        €{(pack.price / pack.credits).toFixed(2)}/credit
+                      </p>
+                    </div>
                   </div>
-                </button>
+                  {selectedPack === pack.id && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute top-3 right-3 w-6 h-6 rounded-full bg-accent flex items-center justify-center"
+                    >
+                      <Check className="h-4 w-4 text-white" />
+                    </motion.div>
+                  )}
+                </motion.button>
               ))}
             </div>
 
             {/* Payment info */}
-            <div className="px-6 pb-6">
-              <div className="bg-muted rounded-xl p-4 mb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <CreditCard className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">Payment method</span>
-                </div>
-                <div className="flex gap-2">
-                  <div className="h-8 w-12 bg-card rounded border border-border flex items-center justify-center text-xs text-muted-foreground">
-                    Visa
+            <div className="px-6 pb-6 space-y-4">
+              <div className="card-elevated rounded-2xl p-5 border border-white/5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-accent/10">
+                    <CreditCard className="h-5 w-5 text-accent" />
                   </div>
-                  <div className="h-8 w-12 bg-card rounded border border-border flex items-center justify-center text-xs text-muted-foreground">
-                    MC
-                  </div>
-                  <div className="h-8 w-12 bg-card rounded border border-border flex items-center justify-center text-xs text-muted-foreground">
-                    iDEAL
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Secure Payment</p>
+                    <p className="text-xs text-muted-foreground">Powered by Stripe</p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Secure payments via Stripe
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="px-3 py-1.5 bg-card rounded-lg border border-white/10 text-xs font-medium text-foreground">
+                    💳 Visa
+                  </div>
+                  <div className="px-3 py-1.5 bg-card rounded-lg border border-white/10 text-xs font-medium text-foreground">
+                    💳 Mastercard
+                  </div>
+                  <div className="px-3 py-1.5 bg-card rounded-lg border border-white/10 text-xs font-medium text-foreground">
+                    🏦 iDEAL
+                  </div>
+                  <div className="px-3 py-1.5 bg-card rounded-lg border border-white/10 text-xs font-medium text-muted-foreground">
+                    +more
+                  </div>
+                </div>
               </div>
 
               <Button
                 variant="hero"
                 size="lg"
-                className="w-full"
+                className="w-full text-base h-14 hover:scale-[1.02] transition-transform"
                 onClick={handlePurchase}
                 disabled={!selectedPack || isLoading}
                 data-api="/api/user/buy_pack"
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Processing payment...
                   </>
                 ) : (
-                  <>
-                    Buy now — €{creditPacks.find(p => p.id === selectedPack)?.price}
-                  </>
+                  <div className="flex items-center gap-3">
+                    <Zap className="h-5 w-5" />
+                    <span>
+                      Buy {creditPacks.find(p => p.id === selectedPack)?.credits} Credits — €{creditPacks.find(p => p.id === selectedPack)?.price}
+                    </span>
+                  </div>
                 )}
               </Button>
+
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <div className="w-1.5 h-1.5 rounded-full bg-success/50"></div>
+                <p>Credits added instantly after payment</p>
+              </div>
             </div>
           </motion.div>
         </motion.div>

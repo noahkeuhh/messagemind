@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (error) {
         console.error('Error getting initial session:', error);
+        // Don't fail completely - just set to logged out state
         setSession(null);
         setUser(null);
         setLoading(false);

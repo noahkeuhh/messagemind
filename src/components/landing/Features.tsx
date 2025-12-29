@@ -13,52 +13,52 @@ import {
 const features = [
   {
     icon: Brain,
-    title: "Intent Detectie",
-    description: "Begrijp wat ze écht bedoelt, niet wat ze zegt. Onze AI leest tussen de regels.",
+    title: "Intent Detection",
+    description: "Understand what she truly means, not just what she says. Our AI reads between the lines.",
     color: "from-violet-500 to-purple-600",
     highlight: true,
   },
   {
     icon: Target,
     title: "Tone Score",
-    description: "Zie direct hoe geïnteresseerd ze is met een score van 0-100.",
+    description: "See instantly how interested she is with a 0-100 score.",
     color: "from-blue-500 to-cyan-500",
   },
   {
     icon: MessageSquare,
     title: "Reply Templates",
-    description: "3 perfect afgestemde antwoorden: Direct, Speels, of Confident.",
+    description: "3 perfectly tuned replies: Direct, Playful, or Confident.",
     color: "from-accent to-rose-500",
   },
   {
     icon: Clock,
-    title: "Timing Advies",
-    description: "Weet precies wanneer je moet reageren voor maximale impact.",
+    title: "Timing Advice",
+    description: "Know exactly when to respond for maximum impact.",
     color: "from-emerald-500 to-teal-500",
   },
   {
     icon: Sparkles,
-    title: "Profiel Analyse",
-    description: "Upload haar profielfoto voor stijl- en gespreksadvies.",
+    title: "Profile Analysis",
+    description: "Upload her profile photo for style and conversation guidance.",
     color: "from-amber-500 to-orange-500",
     comingSoon: true,
   },
   {
     icon: Bookmark,
-    title: "Opslaan & Hergebruiken",
-    description: "Sla je beste antwoorden op voor later gebruik.",
+    title: "Save & Reuse",
+    description: "Save your best replies for later use.",
     color: "from-pink-500 to-rose-500",
   },
   {
     icon: History,
-    title: "Chat Geschiedenis",
-    description: "Bekijk al je eerdere analyses en leer van je succes.",
+    title: "Chat History",
+    description: "Review your past analyses and learn from your wins.",
     color: "from-indigo-500 to-violet-500",
   },
   {
     icon: Shield,
     title: "100% Privacy",
-    description: "Je chats worden versleuteld en nooit gedeeld. GDPR compliant.",
+    description: "Your chats are encrypted and never shared. GDPR compliant.",
     color: "from-slate-500 to-gray-600",
   },
 ];
@@ -87,10 +87,10 @@ export const Features = () => {
             Features
           </motion.span>
           <h2 className="text-4xl md:text-5xl font-bold font-display text-foreground mb-6">
-            Alles wat je nodig hebt
+            Everything you need
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Krachtige tools om elk gesprek naar een hoger niveau te tillen
+            Powerful tools to level up every conversation
           </p>
         </motion.div>
 
